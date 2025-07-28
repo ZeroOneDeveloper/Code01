@@ -13,6 +13,31 @@ import ThemeToggle from "@components/ThemeToggle";
 import { DarkLogo, LightLogo } from "@components/Logo";
 import { createClient } from "@lib/supabase/client";
 
+const menuItems = [
+  {
+    label: "Dashboard",
+    href: "/dashboard",
+    adminOnly: true,
+    className: "text-emerald-600 dark:text-emerald-500",
+  },
+  {
+    label: "Organization",
+    href: "/organization",
+    className: "text-orange-600 dark:text-orange-400",
+  },
+  {
+    label: "Manage account",
+    href: "/account",
+    className: "text-blue-600 dark:text-blue-400",
+  },
+  {
+    label: "Log out",
+    href: "/logout",
+    className: "text-red-600 dark:text-red-400",
+    action: "logout",
+  },
+];
+
 export default function Header() {
   const supabase = createClient();
   const router = useRouter();
@@ -115,33 +140,25 @@ export default function Header() {
                     </span>
                   </div>
                   <hr className="border-gray-200 dark:border-gray-700" />
-                  {userProfile && userProfile.is_admin && (
-                    <button
-                      onClick={() => {
-                        router.push("/dashboard");
-                        setDropdownOpen(false);
-                      }}
-                      className="w-full text-left px-4 py-2 text-sm text-emerald-600 dark:text-emerald-500 hover:bg-gray-100 dark:hover:bg-[#2a2a2a]"
-                    >
-                      Dashboard
-                    </button>
-                  )}
-                  <button
-                    onClick={() => {
-                      router.push("/account");
-                      setDropdownOpen(false);
-                    }}
-                    className="w-full text-left px-4 py-2 text-sm text-blue-600 dark:text-blue-400 hover:bg-gray-100 dark:hover:bg-[#2a2a2a]"
-                  >
-                    Manage account
-                  </button>
-
-                  <button
-                    onClick={handleLogout}
-                    className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 dark:hover:bg-[#2a2a2a] dark:text-red-400"
-                  >
-                    Log out
-                  </button>
+                  {menuItems.map((item, i) => {
+                    if (item.adminOnly && !userProfile?.is_admin) return null;
+                    return (
+                      <button
+                        key={i}
+                        onClick={() => {
+                          if (item.action === "logout") {
+                            handleLogout();
+                          } else {
+                            router.push(item.href);
+                          }
+                          setDropdownOpen(false);
+                        }}
+                        className={`w-full text-left px-4 py-2 text-sm ${item.className} hover:bg-gray-100 dark:hover:bg-[#2a2a2a]`}
+                      >
+                        {item.label}
+                      </button>
+                    );
+                  })}
                 </motion.div>
               )}
             </AnimatePresence>
@@ -199,33 +216,25 @@ export default function Header() {
                     </span>
                   </div>
                   <hr className="w-full border-gray-200 dark:border-gray-700" />
-                  {userProfile && userProfile.is_admin && (
-                    <button
-                      onClick={() => {
-                        router.push("/dashboard");
-                        setMobileMenuOpen(false);
-                      }}
-                      className="w-full text-left py-2 text-sm text-emerald-600 dark:text-emerald-500"
-                    >
-                      Dashboard
-                    </button>
-                  )}
-                  <button
-                    onClick={() => {
-                      router.push("/account");
-                      setMobileMenuOpen(false);
-                    }}
-                    className="w-full text-left py-2 text-sm text-blue-600 dark:text-blue-400"
-                  >
-                    Manage account
-                  </button>
-
-                  <button
-                    onClick={handleLogout}
-                    className="w-full text-left py-2 text-sm text-red-600 dark:text-red-400"
-                  >
-                    Log out
-                  </button>
+                  {menuItems.map((item, i) => {
+                    if (item.adminOnly && !userProfile?.is_admin) return null;
+                    return (
+                      <button
+                        key={i}
+                        onClick={() => {
+                          if (item.action === "logout") {
+                            handleLogout();
+                          } else {
+                            router.push(item.href);
+                          }
+                          setMobileMenuOpen(false);
+                        }}
+                        className={`w-full text-left px-4 py-2 text-sm ${item.className} hover:bg-gray-100 dark:hover:bg-[#2a2a2a]`}
+                      >
+                        {item.label}
+                      </button>
+                    );
+                  })}
                 </>
               ) : (
                 <>
