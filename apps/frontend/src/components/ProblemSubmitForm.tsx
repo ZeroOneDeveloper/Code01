@@ -10,9 +10,10 @@ import { useTheme } from "next-themes";
 import Editor from "@monaco-editor/react";
 
 const ProblemSubmitForm: React.FC<{
+  userId: string;
   problemId: string;
   defaultCode: string;
-}> = ({ problemId, defaultCode }) => {
+}> = ({ userId, problemId, defaultCode }) => {
   const { theme } = useTheme();
   const router = useRouter();
   const [editorTheme, setEditorTheme] = useState("vs-light");
@@ -77,11 +78,16 @@ const ProblemSubmitForm: React.FC<{
       <button
         className="bg-primary w-fit px-4 py-2"
         onClick={() => {
-          axios.post(`/api/createProblem/`, {
-            problemId,
-            code,
-          });
-          router.push(`/problem/${problemId}/submissions`);
+          axios
+            .post(`${process.env.NEXT_PUBLIC_API_URL}/runner/`, {
+              userId,
+              problemId,
+              code,
+              visibility,
+            })
+            .then(() =>
+              router.push(`/problem/${problemId}/submissions?user_id=true`),
+            );
         }}
       >
         제출

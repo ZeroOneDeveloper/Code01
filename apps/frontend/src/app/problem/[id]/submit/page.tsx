@@ -18,6 +18,8 @@ const ProblemSubmitPage: React.FC<{
     .eq("id", isNumeric(id) ? parseInt(id, 10) : id)
     .maybeSingle();
 
+  const userId = (await supabase.auth.getUser()).data.user!.id;
+
   return (
     <div className="flex flex-col gap-8">
       <div>
@@ -26,7 +28,7 @@ const ProblemSubmitPage: React.FC<{
         <hr className="border-[0.5] border-gray-200 dark:border-gray-700" />
       </div>
 
-      <ProblemSubmitForm problemId={id} defaultCode={data.default_code} />
+      <ProblemSubmitForm userId={userId} problemId={id} defaultCode={data.default_code} />
     </div>
   );
 };
