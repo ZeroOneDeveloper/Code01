@@ -56,7 +56,10 @@ const OrganizationPage = async () => {
   return (
     <div className="min-h-screen flex items-center justify-center py-44">
       <div className="flex flex-col gap-8 md:w-1/2">
-        <h1 className="text-left text-4xl font-bold">Organizations</h1>
+        <div className="flex flex-col gap-2 ">
+          <h1 className="text-left text-4xl font-bold">Organizations</h1>
+          <hr className="border-gray-200 dark:border-gray-700" />
+        </div>
         <div className="grid xl:grid-cols-3 lg:grid-cols-2 md:grid-cols-1 sm:grid-cols-1 gap-4">
           {organizations.length > 0 && (
             <div>

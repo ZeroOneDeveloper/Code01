@@ -1,13 +1,14 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import Link from "next/link";
+import { useParams, useSearchParams } from "next/navigation";
 
 import { Submission } from "@lib/types";
 import { createClient } from "@lib/supabase/client";
-import Link from "next/link";
 
 const SubmissionsPage: React.FC = () => {
+  const params = useParams<{ id: string }>();
   const searchParams = useSearchParams();
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [nicknames, setNicknames] = useState<Record<string, string>>({});
@@ -22,6 +23,7 @@ const SubmissionsPage: React.FC = () => {
       let query = supabase
         .from("problem_submissions")
         .select("*")
+        .eq("problem_id", params.id)
         .order("submitted_at", { ascending: false });
 
       if (searchParams.get("user_id") == "true") {
@@ -69,7 +71,6 @@ const SubmissionsPage: React.FC = () => {
               "결과",
               "메모리",
               "시간",
-
               "코드 길이",
               "제출한 시간",
               "코드",

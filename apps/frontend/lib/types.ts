@@ -24,6 +24,14 @@ export interface Submission {
   visibility: "public" | "private" | "correct";
 }
 
+export interface Organization {
+  id: number;
+  name: string;
+  is_private: boolean;
+  created_by: string;
+  created_at: string;
+}
+
 export enum SubmissionStatus {
   Pending = 0,
   Accepted = 1,
