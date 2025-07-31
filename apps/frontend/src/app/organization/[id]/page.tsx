@@ -48,7 +48,7 @@ const OrganizationManagementPage: React.FC = () => {
     });
   };
 
-  const fetchMembers = async () => {
+  const fetchMembers = useCallback(async () => {
     const { data: membersData, error } = await supabase
       .from("organization_members")
       .select("*")
@@ -97,7 +97,7 @@ const OrganizationManagementPage: React.FC = () => {
         }[],
       );
     }
-  };
+  }, [supabase, id]);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -114,7 +114,7 @@ const OrganizationManagementPage: React.FC = () => {
     };
 
     fetchUser();
-  });
+  }, [supabase]);
 
   useEffect(() => {
     const fetchOrganization = async () => {
@@ -134,11 +134,11 @@ const OrganizationManagementPage: React.FC = () => {
     };
 
     fetchOrganization();
-  }, []);
+  }, [supabase, id]);
 
   useEffect(() => {
     fetchMembers();
-  }, []);
+  }, [fetchMembers]);
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -159,7 +159,7 @@ const OrganizationManagementPage: React.FC = () => {
     };
 
     fetchUsers();
-  }, [members]);
+  }, [supabase, members]);
 
   const [modal, setModal] = useState<{
     type: "role" | "remove";
@@ -213,7 +213,7 @@ const OrganizationManagementPage: React.FC = () => {
 
     setModal(null);
     fetchMembers();
-  }, [modal]);
+  }, [modal, id, supabase, theme, fetchMembers]);
 
   if (!organization) {
     return (

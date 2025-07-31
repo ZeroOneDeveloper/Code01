@@ -23,6 +23,7 @@ const menuItems = [
   {
     label: "Organization",
     href: "/organization",
+    adminOnly: true,
     className: "text-orange-600 dark:text-orange-400",
   },
   {

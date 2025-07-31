@@ -58,7 +58,7 @@ const SubmissionsPage: React.FC = () => {
     };
 
     fetchSubmissions();
-  }, [searchParams]);
+  }, [searchParams, params.id]);
 
   return (
     <div className="p-4">

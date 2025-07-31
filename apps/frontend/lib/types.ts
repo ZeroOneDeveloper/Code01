@@ -34,6 +34,24 @@ export interface Organization {
   created_at: string;
 }
 
+export interface Problem {
+  id: number;
+  created_at: string;
+  title: string;
+  description: string;
+  published_at: string;
+  created_by: string;
+  input_description: string;
+  output_description: string;
+  conditions: string[];
+  sample_inputs: string[];
+  sample_outputs: string[];
+  default_code: string;
+  time_limit: number;
+  memory_limit: number;
+  organization_id: number;
+}
+
 export enum SubmissionStatus {
   Pending = 0,
   Accepted = 1,

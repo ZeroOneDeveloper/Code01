@@ -40,7 +40,7 @@ const OrganizationCard: React.FC<{
       ) : (
         <div className="flex items-center gap-2">
           <LockOpen className="w-8 h-auto" />
-          <h1 className="text-xl font-bold">공개 조</h1>
+          <h1 className="text-xl font-bold">공개 조직</h1>
         </div>
       )}
       <div className="flex items-center gap-2">

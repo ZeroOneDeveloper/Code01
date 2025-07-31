@@ -1,18 +1,12 @@
 "use client";
 
 import React from "react";
-import {
-  useParams,
-  usePathname,
-  useRouter,
-  useSearchParams,
-} from "next/navigation";
+import { useParams, usePathname, useRouter } from "next/navigation";
 
 const OrganizationTabs: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const pathname = usePathname();
-  // const searchParams = useSearchParams();
 
   return (
     <div className="flex gap-1">

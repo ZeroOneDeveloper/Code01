@@ -1,13 +1,23 @@
 import React from "react";
 
 import { createClient } from "@lib/supabase/server";
+import ProblemCard from "@components/ProblemCard";
 
 export default async function Home() {
   const supabase = await createClient();
-  const { data: user } = await supabase.auth.getUser();
+  const { user } = (await supabase.auth.getUser()).data;
 
-  if (user["user"]) {
-    return <div className="min-h-screen"></div>;
+  const { data: problems } = await supabase
+    .from("problems")
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  if (user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center py-44">
+        <ProblemCard problem={problems![0]} href={"/problems/"} />
+      </div>
+    );
   }
 
   return (
