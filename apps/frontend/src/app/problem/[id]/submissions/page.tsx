@@ -71,9 +71,9 @@ const SubmissionsPage: React.FC = () => {
               "결과",
               "메모리",
               "시간",
+              "코드",
               "코드 길이",
               "제출한 시간",
-              "코드",
             ].map((header, i) => (
               <th key={i} className="p-2 text-center">
                 {header}

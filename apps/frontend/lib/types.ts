@@ -4,6 +4,8 @@ export interface UserProfile {
   student_id: string;
   nickname: string;
   name: string;
+  email: string;
+  created_at: string;
 }
 
 export interface Submission {

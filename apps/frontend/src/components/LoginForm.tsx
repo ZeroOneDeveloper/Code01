@@ -2,6 +2,7 @@
 
 import React, { useEffect } from "react";
 import Link from "next/link";
+import { useTheme } from "next-themes";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { Bounce, toast } from "react-toastify";
@@ -10,6 +11,7 @@ import { createClient } from "@lib/supabase/client";
 
 const LoginForm = () => {
   const router = useRouter();
+  const { theme } = useTheme();
   const code = useSearchParams().get("code");
 
   const supabase = createClient();
@@ -70,7 +72,7 @@ const LoginForm = () => {
                   pauseOnHover: true,
                   draggable: true,
                   progress: undefined,
-                  theme: localStorage.getItem("theme") || "light",
+                  theme: theme === "dark" ? "dark" : "light",
                   transition: Bounce,
                 });
               } else {
