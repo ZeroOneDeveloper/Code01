@@ -18,12 +18,21 @@ async def run_code_in_background(
     pendingId: str,
     code: str,
     problem_id: str,
-    timeLimitMs: int = 20000,
-    memoryLimitMb: int = 128,
 ):
     test_cases = (await supabase.table("test_cases").select("input, output").eq(
         "problem_id", problem_id
     ).execute()).data
+
+    problem = (
+        await supabase.table("problems").select("time_limit, memory_limit").eq(
+            "id", problem_id
+        ).execute()
+    ).data
+    if not problem:
+        return [{"error": "Problem not found."}]
+
+    timeLimitMs = problem[0]["time_limit"] * 1000 if problem[0]["time_limit"] is not None else 20000
+    memoryLimitMb = problem[0]["memory_limit"] if problem[0]["memory_limit"] is not None else 128
 
     if not test_cases:
         return [{"error": "No test cases found for the problem."}]
