@@ -2,12 +2,12 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-
-import Checkbox from "@components/Checkbox";
+import { useTheme } from "next-themes";
 
 import axios from "axios";
-import { useTheme } from "next-themes";
 import Editor from "@monaco-editor/react";
+
+import Checkbox from "@components/Checkbox";
 
 const ProblemSubmitForm: React.FC<{
   userId: string;
@@ -16,7 +16,7 @@ const ProblemSubmitForm: React.FC<{
 }> = ({ userId, problemId, defaultCode }) => {
   const { theme } = useTheme();
   const router = useRouter();
-  const [editorTheme, setEditorTheme] = useState("vs-light");
+  const [editorTheme, setEditorTheme] = useState("light");
   const [code, setCode] = useState<string>(defaultCode);
 
   useEffect(() => {

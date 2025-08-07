@@ -7,15 +7,51 @@ export default async function Home() {
   const supabase = await createClient();
   const { user } = (await supabase.auth.getUser()).data;
 
-  const { data: problems } = await supabase
-    .from("problems")
-    .select("*")
-    .order("created_at", { ascending: false });
-
   if (user) {
+    const { data: problems } = await supabase
+      .from("problems")
+      .select(
+        "*, organizations(id, name, is_private, organization_members(user_id))",
+      )
+      .order("created_at", { ascending: false });
+
+    const visibleProblems = (problems || []).filter((problem) => {
+      const org = problem.organizations;
+      if (!org) return true;
+      if (!org.is_private) return true;
+      return org.organization_members?.some(
+        (m: { user_id: string }) => m.user_id === user.id,
+      );
+    });
+
+    const grouped = visibleProblems.reduce((acc: any, p: any) => {
+      const key = p.organizations?.id || "public";
+      if (!acc[key]) {
+        acc[key] = {
+          name: p.organizations?.name || "공개 문제",
+          problems: [],
+        };
+      }
+      acc[key].problems.push(p);
+      return acc;
+    }, {});
+
     return (
-      <div className="min-h-screen flex items-center justify-center py-44">
-        <ProblemCard problem={problems![0]} href={"/problems/"} />
+      <div className="min-h-screen flex flex-col items-center justify-center py-44">
+        {Object.entries(grouped).map(([orgId, group]: any) => (
+          <div key={orgId}>
+            <h2 className="text-2xl font-bold mb-4">{group.name}</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
+              {group.problems.map((problem: any) => (
+                <ProblemCard
+                  key={problem.id}
+                  problem={problem}
+                  href={`/problem/${problem.id}`}
+                />
+              ))}
+            </div>
+          </div>
+        ))}
       </div>
     );
   }
