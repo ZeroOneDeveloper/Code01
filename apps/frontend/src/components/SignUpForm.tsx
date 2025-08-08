@@ -68,7 +68,7 @@ const SignUpForm = () => {
         />
       </div>
       <button
-        className="bg-primary text-white px-4 py-2 rounded-lg font-bold transition-all duration-300 ease-in-out hover:scale-110 shadow-md"
+        className="bg-primary text-white px-4 py-2 rounded-lg font-bold transition-all duration-300 ease-in-out hover:scale-110 shadow-md hover:cursor-pointer"
         onClick={(e) => {
           e.preventDefault();
           if (!isValidEmail(email)) {

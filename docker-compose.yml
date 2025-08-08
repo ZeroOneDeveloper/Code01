@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  backend:
+    build: ./apps/backend
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./apps/backend:/app
+  frontend:
+    build: ./apps/frontend
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./apps/frontend:/app

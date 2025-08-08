@@ -1,5 +1,6 @@
 import React from "react";
 
+import { Problem } from "@lib/types";
 import { createClient } from "@lib/supabase/server";
 import ProblemCard from "@components/ProblemCard";
 
@@ -8,41 +9,69 @@ export default async function Home() {
   const { user } = (await supabase.auth.getUser()).data;
 
   if (user) {
+    // Fetch all problems
     const { data: problems } = await supabase
       .from("problems")
-      .select(
-        "*, organizations(id, name, is_private, organization_members(user_id))",
-      )
+      .select("*")
       .order("created_at", { ascending: false });
 
-    const visibleProblems = (problems || []).filter((problem) => {
-      const org = problem.organizations;
-      if (!org) return true;
-      if (!org.is_private) return true;
-      return org.organization_members?.some(
-        (m: { user_id: string }) => m.user_id === user.id,
-      );
-    });
+    // Cache for organizations to avoid duplicate queries
+    const organizations: Record<
+      string,
+      { id: string; name: string; is_private: boolean }
+    > = {};
 
-    const grouped = visibleProblems.reduce((acc: any, p: any) => {
-      const key = p.organizations?.id || "public";
-      if (!acc[key]) {
-        acc[key] = {
-          name: p.organizations?.name || "공개 문제",
-          problems: [],
-        };
+    // Filter and group visible problems
+    const visibleProblems: {
+      [orgId: string]: { name: string; problems: Problem[] };
+    } = {};
+
+    if (problems) {
+      for (const problem of problems) {
+        if (problem.organization_id) {
+          let org = organizations[String(problem.organization_id)];
+          if (!org) {
+            const { data: orgData } = await supabase
+              .from("organizations")
+              .select("id, name, is_private")
+              .eq("id", problem.organization_id)
+              .maybeSingle();
+            if (!orgData) continue;
+            org = orgData;
+            organizations[String(org.id)] = org;
+          }
+
+          if (org.is_private) {
+            const { count } = await supabase
+              .from("organization_members")
+              .select("*", { count: "exact", head: true })
+              .eq("organization_id", org.id)
+              .eq("user_id", user.id);
+            if (!count) continue;
+          }
+
+          const key = String(org.id);
+          if (!visibleProblems[key]) {
+            visibleProblems[key] = { name: org.name, problems: [] };
+          }
+          visibleProblems[key].problems.push(problem);
+        } else {
+          const key = "public";
+          if (!visibleProblems[key]) {
+            visibleProblems[key] = { name: "공개 문제", problems: [] };
+          }
+          visibleProblems[key].problems.push(problem);
+        }
       }
-      acc[key].problems.push(p);
-      return acc;
-    }, {});
+    }
 
     return (
       <div className="min-h-screen flex flex-col items-center justify-center py-44">
-        {Object.entries(grouped).map(([orgId, group]: any) => (
+        {Object.entries(visibleProblems).map(([orgId, group]) => (
           <div key={orgId}>
             <h2 className="text-2xl font-bold mb-4">{group.name}</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
-              {group.problems.map((problem: any) => (
+              {group.problems.map((problem) => (
                 <ProblemCard
                   key={problem.id}
                   problem={problem}
@@ -52,6 +81,27 @@ export default async function Home() {
             </div>
           </div>
         ))}
+        {/*{Object.entries(grouped).map(([orgId, group]) => (*/}
+        {/*  <div key={orgId}>*/}
+        {/*    <h2 className="text-2xl font-bold mb-4">*/}
+        {/*      {group.organization.name}*/}
+        {/*    </h2>*/}
+        {/*    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">*/}
+        {/*      /!*{group.problems.map((problem) => (*!/*/}
+        {/*      /!*  <ProblemCard*!/*/}
+        {/*      /!*    key={problem.id}*!/*/}
+        {/*      /!*    problem={problem}*!/*/}
+        {/*      /!*    href={`/problem/${problem.id}`}*!/*/}
+        {/*      /!*  />*!/*/}
+        {/*      /!*))}*!/*/}
+        {/*      <ProblemCard*/}
+        {/*        key={group.id}*/}
+        {/*        problem={group}*/}
+        {/*        href={`/problem/${group.id}`}*/}
+        {/*      />*/}
+        {/*    </div>*/}
+        {/*  </div>*/}
+        {/*))}*/}
       </div>
     );
   }
