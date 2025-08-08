@@ -78,7 +78,7 @@ int main(void) {
     };
 
     fetchUser();
-  }, [supabase]);
+  }, [supabase, theme]);
 
   useEffect(() => {
     setEditorTheme(theme === "dark" ? "vs-dark" : "light");
@@ -321,8 +321,10 @@ int main(void) {
       <div className="sticky bottom-0 bg-white dark:bg-gray-900 p-4 border-t border-gray-200 dark:border-gray-700 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div className="text-gray-600 dark:text-gray-400 text-sm">
           모든 정보를 입력한 후{" "}
-          <strong className="text-black dark:text-white">"생성"</strong> 버튼을
-          눌러 문제를 등록하세요.
+          <strong className="text-black dark:text-white">
+            &quot;생성&quot;
+          </strong>{" "}
+          버튼을 눌러 문제를 등록하세요.
         </div>
         <button
           className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition self-end md:self-auto"
@@ -392,7 +394,19 @@ int main(void) {
               return;
             }
 
-            // await supabase.from("problems").insert({});
+            await supabase.from("problems").insert({
+              title,
+              description,
+              created_by: user?.id,
+              input_description: inputDescription,
+              output_description: outputDescription,
+              sample_inputs: examplePairs.map((pair) => pair.input),
+              sample_outputs: examplePairs.map((pair) => pair.output),
+              time_limit: timeLimit,
+              memory_limit: memoryLimit,
+              published_at: new Date(publishedAt).toISOString(),
+              default_code: code,
+            });
           }}
         >
           생성
