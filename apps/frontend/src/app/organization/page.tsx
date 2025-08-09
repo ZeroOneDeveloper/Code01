@@ -53,6 +53,16 @@ const OrganizationPage = async () => {
     );
   }
 
+  const orgsWithCounts = await Promise.all(
+    (organizations ?? []).map(async (org) => {
+      const { count } = await supabase
+        .from("organization_members")
+        .select("*", { count: "exact", head: true })
+        .eq("organization_id", org.id);
+      return { org, count: count ?? 0 };
+    }),
+  );
+
   return (
     <div className="min-h-screen flex items-center justify-center py-44">
       <div className="flex flex-col gap-8 md:w-1/2">
@@ -60,25 +70,14 @@ const OrganizationPage = async () => {
           <h1 className="text-left text-4xl font-bold">Organizations</h1>
           <hr className="border-gray-200 dark:border-gray-700" />
         </div>
-        <div className="grid xl:grid-cols-3 lg:grid-cols-2 md:grid-cols-1 sm:grid-cols-1 gap-4">
-          {organizations.length > 0 && (
-            <div>
-              {organizations.map(async (org, i) => {
-                const { data: members } = await supabase
-                  .from("organization_members")
-                  .select("*")
-                  .eq("organization_id", org.id);
-
-                return (
-                  <OrganizationCard
-                    key={i}
-                    organization={org}
-                    organizationMemberCount={members ? members.length : 0}
-                  />
-                );
-              })}
-            </div>
-          )}
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+          {orgsWithCounts.map(({ org, count }) => (
+            <OrganizationCard
+              key={org.id}
+              organization={org}
+              organizationMemberCount={count}
+            />
+          ))}
           <OrganizationCard />
         </div>
       </div>

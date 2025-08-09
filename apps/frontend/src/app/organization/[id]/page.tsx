@@ -288,7 +288,7 @@ const OrganizationManagementPage: React.FC = () => {
                           })
                         }
                       >
-                        <UserMinus className="w-6 h-auto bg-red-400 p-1 rounded-md text-white dark:text-black" />
+                        <UserMinus className="w-6 h-auto bg-red-400 p-1 rounded-md text-white dark:text-black hover:cursor-pointer" />
                       </button>
                       {member.role === "admin" ? (
                         <button
@@ -300,7 +300,7 @@ const OrganizationManagementPage: React.FC = () => {
                             })
                           }
                         >
-                          <User className="w-6 h-auto bg-green-400 p-1 rounded-md text-white dark:text-black" />
+                          <User className="w-6 h-auto bg-green-400 p-1 rounded-md text-white dark:text-black hover:cursor-pointer" />
                         </button>
                       ) : (
                         <button
@@ -312,7 +312,7 @@ const OrganizationManagementPage: React.FC = () => {
                             })
                           }
                         >
-                          <ShieldUser className="w-6 h-auto bg-blue-400 p-1 rounded-md text-white dark:text-black" />
+                          <ShieldUser className="w-6 h-auto bg-blue-400 p-1 rounded-md text-white dark:text-black hover:cursor-pointer" />
                         </button>
                       )}
                     </td>
@@ -330,7 +330,7 @@ const OrganizationManagementPage: React.FC = () => {
         </table>
         <div className="w-full flex justify-end">
           <button
-            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors hover:cursor-pointer"
             onClick={() => setInviteModalOpen(true)}
           >
             초대
