@@ -85,9 +85,12 @@ const ProblemSubmitForm: React.FC<{
               code,
               visibility,
             })
-            .then(() =>
-              router.push(`/problem/${problemId}/submissions?user_id=true`),
-            );
+            .then((res) => {
+              const pendingId = res.data.pendingId;
+              router.push(
+                `/problem/${problemId}/submissions?user_id=true&pendingId=${pendingId}`,
+              );
+            });
         }}
       >
         제출

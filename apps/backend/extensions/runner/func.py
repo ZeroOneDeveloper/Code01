@@ -2,6 +2,7 @@ import os
 import re
 import uuid
 import time
+import logging
 import subprocess
 from supabase import AsyncClient
 
@@ -15,27 +16,31 @@ def parse_time_E(time_str):
 
 async def run_code_in_background(
     supabase: AsyncClient,
-    pendingId: str,
+    pendingId: int,
     code: str,
-    problem_id: str,
+    problem_id: int,
 ):
-    test_cases = (await supabase.table("test_cases").select("input, output").eq(
-        "problem_id", problem_id
-    ).execute()).data
-
     problem = (
         await supabase.table("problems").select("time_limit, memory_limit").eq(
             "id", problem_id
         ).execute()
     ).data
     if not problem:
-        return [{"error": "Problem not found."}]
+        logging.warning(
+            f"Problem with ID {problem_id} not found in the database."
+        )
+        return None
 
     timeLimitMs = problem[0]["time_limit"] * 1000 if problem[0]["time_limit"] is not None else 20000
     memoryLimitMb = problem[0]["memory_limit"] if problem[0]["memory_limit"] is not None else 128
 
+    test_cases = (await supabase.table("test_cases").select("input, output").eq(
+        "problem_id", problem_id
+    ).execute()).data
+
     if not test_cases:
-        return [{"error": "No test cases found for the problem."}]
+        logging.warning(f"No test cases found for problem {problem_id}.")
+        return None
 
     temp_id = str(uuid.uuid4())
     code_path = f"/tmp/{temp_id}.c"
@@ -76,7 +81,7 @@ async def run_code_in_background(
         ).eq("problem_id", problem_id).execute()
         return [{"error": "Compilation failed", "log": compile_result.stderr}]
 
-    for test_case in test_cases:
+    for index, test_case in enumerate(test_cases):
         input_data = test_case["input"]
         expected_output = test_case["output"]
 
@@ -121,6 +126,13 @@ async def run_code_in_background(
                 "memoryExceeded": mem_kb and mem_kb > memoryLimitMb * 1024,
             }
         )
+
+        await supabase.table("problem_submissions").update(
+            {
+                "cases_total": len(test_cases),
+                "cases_done": index + 1,
+            }
+        ).eq("id", pendingId).execute()
 
     # Step 4. 정리
     os.remove(code_path)

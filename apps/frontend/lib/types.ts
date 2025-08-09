@@ -24,6 +24,8 @@ export interface Submission {
   passed_memory_limit: boolean;
   submitted_at: string;
   visibility: "public" | "private" | "correct";
+  cases_total: number;
+  cases_done: number;
 }
 
 export interface Organization {

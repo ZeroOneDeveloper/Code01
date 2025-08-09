@@ -4,14 +4,79 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 
-import { Submission } from "@lib/types";
+import { Submission, SubmissionStatus } from "@lib/types";
+import type { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 import { createClient } from "@lib/supabase/client";
+
+const labels = [
+  "제출 번호",
+  "아이디",
+  "결과",
+  "메모리",
+  "시간",
+  "코드",
+  "코드 길이",
+  "제출한 시간",
+];
+
+// 결과 코드 한글 변환 (SubmissionStatus 기반)
+const toStatusKo = (code: unknown): string => {
+  const n = typeof code === "number" ? code : Number(code);
+  switch (n) {
+    case SubmissionStatus.Pending:
+      return "대기중";
+    case SubmissionStatus.Accepted:
+      return "정답";
+    case SubmissionStatus.WrongAnswer:
+      return "오답";
+    case SubmissionStatus.TimeLimitExceeded:
+      return "시간 초과";
+    case SubmissionStatus.MemoryLimitExceeded:
+      return "메모리 초과";
+    case SubmissionStatus.RuntimeError:
+      return "런타임 에러";
+    case SubmissionStatus.CompilationError:
+      return "컴파일 에러";
+    case SubmissionStatus.InternalError:
+      return "시스템 에러";
+    default:
+      return "알 수 없음";
+  }
+};
 
 const SubmissionsPage: React.FC = () => {
   const params = useParams<{ id: string }>();
   const searchParams = useSearchParams();
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [nicknames, setNicknames] = useState<Record<string, string>>({});
+  const pendingParam =
+    searchParams.get("pending_id") ?? searchParams.get("pendingId") ?? null;
+  const pendingIdNum = pendingParam ? Number(pendingParam) : null;
+
+  // Helper to pull the latest single submission row by id and merge into state
+  const refreshSubmissionById = async (id: number) => {
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("problem_submissions")
+        .select("*")
+        .eq("id", id)
+        .maybeSingle();
+      if (error) {
+        console.debug("[Realtime][pull] error", error);
+        return;
+      }
+      if (data) {
+        setSubmissions((prev) =>
+          prev.map((s) =>
+            Number(s.id) === Number(data.id) ? { ...s, ...data } : s,
+          ),
+        );
+      }
+    } catch (e) {
+      console.debug("[Realtime][pull] exception", e);
+    }
+  };
 
   useEffect(() => {
     const fetchSubmissions = async () => {
@@ -58,23 +123,95 @@ const SubmissionsPage: React.FC = () => {
     };
 
     fetchSubmissions();
-  }, [searchParams, params.id]);
+  }, [params.id, searchParams.toString()]);
+
+  useEffect(() => {
+    const supabase = createClient();
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+
+    if (pendingIdNum !== null) {
+      channel = supabase.channel(`submission-progress-${pendingIdNum}`).on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "problem_submissions",
+          filter: `id=eq.${pendingIdNum}`,
+        },
+        (payload: RealtimePostgresChangesPayload<Submission>) => {
+          console.debug("[Realtime] payload", payload);
+          const row = (payload.new ?? payload.old) as Submission & {
+            cases_done?: number;
+            cases_total?: number;
+            status_code?: number;
+            memory_kb?: number;
+            time_ms?: number;
+          };
+          setSubmissions((prev) =>
+            prev.map((s) =>
+              Number(s.id) === Number(row.id) ? { ...s, ...row } : s,
+            ),
+          );
+          // Pull the freshest row to avoid missing partial fields in payload
+          refreshSubmissionById(Number(row.id));
+        },
+      );
+      console.debug(
+        "[Realtime] subscribing channel",
+        `submission-progress-${pendingIdNum}`,
+      );
+      channel.subscribe();
+    }
+
+    return () => {
+      if (channel) {
+        console.debug(
+          "[Realtime] unsubscribe",
+          `submission-progress-${pendingIdNum}`,
+        );
+        supabase.removeChannel(channel);
+      }
+    };
+  }, [pendingIdNum]);
+
+  // Fallback polling while pending row is active
+  useEffect(() => {
+    if (pendingIdNum === null) return;
+    let timer: ReturnType<typeof setInterval> | null = null;
+
+    const tick = async () => {
+      await refreshSubmissionById(pendingIdNum);
+      // stop automatically if the pending row is complete (cd >= ct) or not present
+      const s = submissions.find((x) => Number(x.id) === pendingIdNum);
+      const cd = (s as any)?.cases_done as number | undefined;
+      const ct = (s as any)?.cases_total as number | undefined;
+      if (
+        typeof cd === "number" &&
+        typeof ct === "number" &&
+        ct > 0 &&
+        cd >= ct
+      ) {
+        if (timer) {
+          clearInterval(timer);
+          timer = null;
+        }
+      }
+    };
+
+    // Start a gentle fallback poll (e.g., 1s) until complete
+    timer = setInterval(tick, 1000);
+
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [pendingIdNum, submissions]);
 
   return (
     <div className="p-4">
       <table className="w-full table-auto border-collapse text-sm text-center">
         <thead>
           <tr className="border-b">
-            {[
-              "제출 번호",
-              "아이디",
-              "결과",
-              "메모리",
-              "시간",
-              "코드",
-              "코드 길이",
-              "제출한 시간",
-            ].map((header, i) => (
+            {labels.map((header, i) => (
               <th key={i} className="p-2 text-center">
                 {header}
               </th>
@@ -84,18 +221,46 @@ const SubmissionsPage: React.FC = () => {
         <tbody>
           {submissions.map((s, idx) => (
             <tr key={idx} className="border-b">
-              {[
-                s.id,
-                nicknames[s.user_id] || "Unknown User",
-                s.status_code,
-                `${s.memory_kb} KB`,
-                `${s.time_ms} ms`,
-                ["조회", `/problem/${s.problem_id}/submission/${s.id}`],
-                `${s.code.length} 자`,
-                new Date(s.submitted_at).toLocaleString("ko-KR", {
-                  timeZone: "Asia/Seoul",
-                }),
-              ].map((v, i) => (
+              {(() => {
+                const cd = (s as any).cases_done as number | undefined;
+                const ct = (s as any).cases_total as number | undefined;
+                const isPendingRow =
+                  pendingIdNum !== null ? Number(s.id) === pendingIdNum : false;
+
+                let resultText: string = toStatusKo((s as any).status_code);
+                if (isPendingRow) {
+                  let pct = 0;
+                  if (
+                    typeof cd === "number" &&
+                    typeof ct === "number" &&
+                    ct > 0
+                  ) {
+                    pct = Math.floor((cd / ct) * 100);
+                    if (cd >= ct) {
+                      pct = 100; // 모든 케이스 완료
+                    } else if (pct > 99) {
+                      pct = 99; // 진행 중인 동안은 최대 99%
+                    }
+                  }
+                  resultText =
+                    cd !== undefined && ct !== undefined && ct > 0 && cd >= ct
+                      ? `${toStatusKo((s as any).status_code)} (${pct}%)`
+                      : `진행중 (${pct}%)`;
+                }
+
+                return [
+                  s.id,
+                  nicknames[s.user_id] || "Unknown User",
+                  resultText,
+                  `${s.memory_kb} KB`,
+                  `${s.time_ms} ms`,
+                  ["조회", `/problem/${s.problem_id}/submission/${s.id}`],
+                  `${s.code.length} 자`,
+                  new Date(s.submitted_at).toLocaleString("ko-KR", {
+                    timeZone: "Asia/Seoul",
+                  }),
+                ];
+              })().map((v, i) => (
                 <td key={i} className="p-2 text-center">
                   {typeof v === "object" ? (
                     <Link
@@ -113,7 +278,10 @@ const SubmissionsPage: React.FC = () => {
           ))}
           {submissions.length === 0 && (
             <tr>
-              <td colSpan={7} className="p-4 text-center text-gray-500">
+              <td
+                colSpan={labels.length}
+                className="p-4 text-center text-gray-500"
+              >
                 제출이 없습니다.
               </td>
             </tr>

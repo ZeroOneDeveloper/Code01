@@ -65,7 +65,7 @@ const DashboardForm: React.FC<{
         <div key={i}>
           <label
             htmlFor={item.htmlFor}
-            className="block text-sm font-medium mb-1"
+            className="block text-sm font-medium mb-1 text-black dark:text-white"
           >
             {item.label}
           </label>
@@ -79,7 +79,7 @@ const DashboardForm: React.FC<{
               setIsEdited(true);
             }}
             disabled={item.disabled}
-            className={`w-full rounded border border-gray-300 dark:border-gray-700 dark:bg-gray-900 px-3 py-2 ${item.disabled ? "bg-gray-100 dark:bg-gray-900 text-gray-500 cursor-not-allowed" : "bg-white dark:text-white text-black"}`}
+            className={`w-full rounded border border-gray-300 dark:border-gray-700 dark:bg-gray-900 px-3 py-2 ${item.disabled ? "bg-gray-100 dark:bg-gray-900 text-gray-500 cursor-not-allowed" : "bg-gray-50 text-black dark:bg-gray-800 dark:text-white"}`}
           />
         </div>
       ))}

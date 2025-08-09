@@ -50,13 +50,15 @@ async def run_code(
             "passed_time_limit": False,
             "passed_memory_limit": False,
             "visibility": problem_submission.visibility,
+            "cases_total": 0,
+            "cases_done": 0,
         }
     ).execute()
     background_tasks.add_task(
         run_code_in_background,
         supabase,
-        inserted.data[0]['id'],
+        int(inserted.data[0]['id']),
         problem_submission.code,
-        problem_submission.problemId,
+        int(problem_submission.problemId) if problem_submission.problemId.isdigit() else problem_submission.problemId,
     )
-    return {"message": "Code is being processed in the background."}
+    return {"message": "Code is being processed in the background.", "pendingId": inserted.data[0]['id']}
