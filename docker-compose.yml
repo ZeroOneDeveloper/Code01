@@ -5,11 +5,15 @@ services:
     build: ./apps/backend
     ports:
       - "3001:3001"
-    volumes:
-      - ./apps/backend:/app
+    environment:
+      - PYTHONUNBUFFERED=1
+    command: uvicorn main:app --host 0.0.0.0 --port 3001
+    restart: unless-stopped
   frontend:
     build: ./apps/frontend
     ports:
       - "3000:3000"
-    volumes:
-      - ./apps/frontend:/app
+    environment:
+      - NEXT_TELEMETRY_DISABLED=1
+    command: pnpm start
+    restart: unless-stopped
