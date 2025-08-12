@@ -44,14 +44,27 @@ const toStatusKo = (code: unknown): string => {
   }
 };
 
+// DB row shape including transient judge fields delivered via realtime/polling
+type SubmissionRow = Submission & {
+  cases_done?: number | null;
+  cases_total?: number | null;
+  status_code?: number | null;
+  memory_kb?: number | null;
+  time_ms?: number | null;
+};
+
 const SubmissionsPage: React.FC = () => {
   const params = useParams<{ id: string }>();
   const searchParams = useSearchParams();
-  const [submissions, setSubmissions] = useState<Submission[]>([]);
+  const [submissions, setSubmissions] = useState<SubmissionRow[]>([]);
   const [nicknames, setNicknames] = useState<Record<string, string>>({});
   const pendingParam =
     searchParams.get("pending_id") ?? searchParams.get("pendingId") ?? null;
   const pendingIdNum = pendingParam ? Number(pendingParam) : null;
+
+  // Derive stable keys from URL params for effect deps
+  const onlyMine = searchParams.get("user_id") === "true";
+  const searchKey = searchParams.toString();
 
   // Helper to pull the latest single submission row by id and merge into state
   const refreshSubmissionById = async (id: number) => {
@@ -91,8 +104,8 @@ const SubmissionsPage: React.FC = () => {
         .eq("problem_id", params.id)
         .order("submitted_at", { ascending: false });
 
-      if (searchParams.get("user_id") == "true") {
-        query = query.eq("user_id", user?.id);
+      if (onlyMine && user?.id) {
+        query = query.eq("user_id", user.id);
       }
       const { data, error } = await query;
       if (error) {
@@ -123,7 +136,7 @@ const SubmissionsPage: React.FC = () => {
     };
 
     fetchSubmissions();
-  }, [params.id, searchParams.toString()]);
+  }, [params.id, searchKey, onlyMine]);
 
   useEffect(() => {
     const supabase = createClient();
@@ -138,15 +151,9 @@ const SubmissionsPage: React.FC = () => {
           table: "problem_submissions",
           filter: `id=eq.${pendingIdNum}`,
         },
-        (payload: RealtimePostgresChangesPayload<Submission>) => {
+        (payload: RealtimePostgresChangesPayload<SubmissionRow>) => {
           console.debug("[Realtime] payload", payload);
-          const row = (payload.new ?? payload.old) as Submission & {
-            cases_done?: number;
-            cases_total?: number;
-            status_code?: number;
-            memory_kb?: number;
-            time_ms?: number;
-          };
+          const row = (payload.new ?? payload.old) as SubmissionRow;
           setSubmissions((prev) =>
             prev.map((s) =>
               Number(s.id) === Number(row.id) ? { ...s, ...row } : s,
@@ -183,8 +190,8 @@ const SubmissionsPage: React.FC = () => {
       await refreshSubmissionById(pendingIdNum);
       // stop automatically if the pending row is complete (cd >= ct) or not present
       const s = submissions.find((x) => Number(x.id) === pendingIdNum);
-      const cd = (s as any)?.cases_done as number | undefined;
-      const ct = (s as any)?.cases_total as number | undefined;
+      const cd = s?.cases_done ?? undefined;
+      const ct = s?.cases_total ?? undefined;
       if (
         typeof cd === "number" &&
         typeof ct === "number" &&
@@ -222,12 +229,13 @@ const SubmissionsPage: React.FC = () => {
           {submissions.map((s, idx) => (
             <tr key={idx} className="border-b">
               {(() => {
-                const cd = (s as any).cases_done as number | undefined;
-                const ct = (s as any).cases_total as number | undefined;
+                const cd = s.cases_done ?? undefined;
+                const ct = s.cases_total ?? undefined;
                 const isPendingRow =
                   pendingIdNum !== null ? Number(s.id) === pendingIdNum : false;
 
-                let resultText: string = toStatusKo((s as any).status_code);
+                const statusCode = s.status_code;
+                let resultText: string = toStatusKo(statusCode);
                 if (isPendingRow) {
                   let pct = 0;
                   if (
@@ -244,7 +252,7 @@ const SubmissionsPage: React.FC = () => {
                   }
                   resultText =
                     cd !== undefined && ct !== undefined && ct > 0 && cd >= ct
-                      ? `${toStatusKo((s as any).status_code)} (${pct}%)`
+                      ? `${toStatusKo(statusCode)} (${pct}%)`
                       : `진행중 (${pct}%)`;
                 }
 
@@ -252,8 +260,8 @@ const SubmissionsPage: React.FC = () => {
                   s.id,
                   nicknames[s.user_id] || "Unknown User",
                   resultText,
-                  `${s.memory_kb} KB`,
-                  `${s.time_ms} ms`,
+                  `${s.memory_kb ?? "-"} KB`,
+                  `${s.time_ms ?? "-"} ms`,
                   ["조회", `/problem/${s.problem_id}/submission/${s.id}`],
                   `${s.code.length} 자`,
                   new Date(s.submitted_at).toLocaleString("ko-KR", {

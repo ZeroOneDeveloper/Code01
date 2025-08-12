@@ -19,15 +19,14 @@ const OrganizationCard: React.FC<{
   };
   organizationMemberCount?: number;
 }> = ({ organization, organizationMemberCount }) => {
+  const router = useRouter();
+  const supabase = createClient();
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [isPrivate, setIsPrivate] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   if (!organization) {
-    const router = useRouter();
-    const supabase = createClient();
-    const [open, setOpen] = useState(false);
-    const [name, setName] = useState("");
-    const [isPrivate, setIsPrivate] = useState(false);
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-
     const handleCreate = async () => {
       if (!name.trim()) {
         setError("이름을 입력해 주세요.");
@@ -59,8 +58,9 @@ const OrganizationCard: React.FC<{
         setIsPrivate(false);
         setLoading(false);
         router.refresh();
-      } catch (e: any) {
-        setError(e?.message ?? "생성 중 오류가 발생했습니다.");
+      } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        setError(message || "생성 중 오류가 발생했습니다.");
         setLoading(false);
       }
     };
