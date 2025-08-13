@@ -35,7 +35,7 @@ const SignUpForm = () => {
   const supabase = createClient();
 
   return (
-    <div className="w-5/6 md:w-1/6 shadow-md p-8 rounded-lg text-center flex flex-col gap-4 border-2 border-gray-700/40">
+    <div className="w-5/6 md:w-2/5 2xl:w-1/6 shadow-md p-8 rounded-lg text-center flex flex-col gap-4 border-2 border-gray-700/40">
       <h1 className="text-2xl font-black">Sign Up</h1>
       <div className="flex flex-col">
         <label className="text-left font-medium py-2">Email address</label>
