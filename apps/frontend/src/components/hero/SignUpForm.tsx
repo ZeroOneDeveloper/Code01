@@ -31,11 +31,15 @@ const SignUpForm = () => {
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [confirmPassword, setConfirmPassword] = React.useState("");
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
 
   const supabase = createClient();
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+
+    if (isSubmitting) return;
+
     if (!isValidEmail(email)) {
       notifyError("이메일 형식이 올바르지 않습니다.");
       return;
@@ -52,22 +56,26 @@ const SignUpForm = () => {
       setConfirmPassword("");
       return;
     }
-    supabase.auth
-      .signUp({
+
+    setIsSubmitting(true);
+    try {
+      const { error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           emailRedirectTo: `${window.location.origin}/login`,
         },
-      })
-      .then(({ error }) => {
-        if (error) {
-          notifyError("이메일/비밀번호를 확인해주세요.");
-        } else {
-          console.log("Login successful");
-          router.push("/welcome");
-        }
       });
+
+      if (error) {
+        notifyError("이메일/비밀번호를 확인해주세요.");
+        return;
+      }
+
+      router.push("/welcome");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -107,10 +115,39 @@ const SignUpForm = () => {
         />
       </div>
       <button
-        className="bg-primary text-white px-4 py-2 rounded-lg font-bold transition-all duration-300 ease-in-out hover:scale-110 shadow-md hover:cursor-pointer"
         type="submit"
+        disabled={isSubmitting}
+        aria-busy={isSubmitting}
+        className={
+          `px-4 py-2 rounded-lg font-bold transition-all duration-300 ease-in-out shadow-md flex items-center justify-center gap-2 ` +
+          (isSubmitting
+            ? "bg-gray-300 text-gray-600 dark:bg-gray-700 dark:text-gray-300 cursor-not-allowed hover:scale-100"
+            : "bg-primary text-white hover:scale-110 hover:cursor-pointer")
+        }
       >
-        회원가입
+        {isSubmitting && (
+          <svg
+            className="h-4 w-4 animate-spin"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <circle
+              className="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              strokeWidth="4"
+              fill="none"
+            ></circle>
+            <path
+              className="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+            ></path>
+          </svg>
+        )}
+        {isSubmitting ? "처리중..." : "회원가입"}
       </button>
       <h1 className="text-right text-sm text-gray-500">
         계정이 이미 있으신가요?{" "}
