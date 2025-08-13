@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 
 import { createClient } from "@lib/supabase/server";
 
-import LoginForm from "@components/LoginForm";
+import LoginForm from "@components/hero/LoginForm";
 
 const LoginPage: React.FC = async () => {
   const supabase = await createClient();

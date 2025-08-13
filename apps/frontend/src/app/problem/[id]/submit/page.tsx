@@ -1,7 +1,7 @@
 import React from "react";
 
 import { createClient } from "@lib/supabase/server";
-import ProblemSubmitForm from "@components/ProblemSubmitForm";
+import ProblemSubmitForm from "@components/hero/ProblemSubmitForm";
 
 const isNumeric = (value: string) => /^\d+$/.test(value);
 
@@ -28,7 +28,11 @@ const ProblemSubmitPage: React.FC<{
         <hr className="border-[0.5] border-gray-200 dark:border-gray-700" />
       </div>
 
-      <ProblemSubmitForm userId={userId} problemId={id} defaultCode={data.default_code} />
+      <ProblemSubmitForm
+        userId={userId}
+        problemId={id}
+        defaultCode={data.default_code}
+      />
     </div>
   );
 };

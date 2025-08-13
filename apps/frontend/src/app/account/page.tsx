@@ -5,7 +5,7 @@ import React from "react";
 import { createClient } from "@lib/supabase/server";
 
 import { UserProfile } from "@lib/types";
-import DashboardForm from "@components/DashboardForm";
+import DashboardForm from "@components/hero/DashboardForm";
 
 const DashboardPage: React.FC = async () => {
   const supabase = await createClient();
