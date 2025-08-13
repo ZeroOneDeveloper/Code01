@@ -34,8 +34,47 @@ const SignUpForm = () => {
 
   const supabase = createClient();
 
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!isValidEmail(email)) {
+      notifyError("이메일 형식이 올바르지 않습니다.");
+      return;
+    }
+    if (password.length < 8) {
+      notifyError("비밀번호는 최소 8자 이상이어야 합니다.");
+      setPassword("");
+      setConfirmPassword("");
+      return;
+    }
+    if (password !== confirmPassword) {
+      notifyError("비밀번호가 일치하지 않습니다.");
+      setPassword("");
+      setConfirmPassword("");
+      return;
+    }
+    supabase.auth
+      .signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/login`,
+        },
+      })
+      .then(({ error }) => {
+        if (error) {
+          notifyError("이메일/비밀번호를 확인해주세요.");
+        } else {
+          console.log("Login successful");
+          router.push("/welcome");
+        }
+      });
+  };
+
   return (
-    <div className="w-5/6 md:w-2/5 2xl:w-1/6 shadow-md p-8 rounded-lg text-center flex flex-col gap-4 border-2 border-gray-700/40">
+    <form
+      onSubmit={handleSubmit}
+      className="w-5/6 md:w-2/5 2xl:w-1/6 shadow-md p-8 rounded-lg text-center flex flex-col gap-4 border-2 border-gray-700/40"
+    >
       <h1 className="text-2xl font-black">Sign Up</h1>
       <div className="flex flex-col">
         <label className="text-left font-medium py-2">Email address</label>
@@ -69,41 +108,6 @@ const SignUpForm = () => {
       </div>
       <button
         className="bg-primary text-white px-4 py-2 rounded-lg font-bold transition-all duration-300 ease-in-out hover:scale-110 shadow-md hover:cursor-pointer"
-        onClick={(e) => {
-          e.preventDefault();
-          if (!isValidEmail(email)) {
-            notifyError("이메일 형식이 올바르지 않습니다.");
-            return;
-          }
-          if (password.length < 8) {
-            notifyError("비밀번호는 최소 8자 이상이어야 합니다.");
-            setPassword("");
-            setConfirmPassword("");
-            return;
-          }
-          if (password !== confirmPassword) {
-            notifyError("비밀번호가 일치하지 않습니다.");
-            setPassword("");
-            setConfirmPassword("");
-            return;
-          }
-          supabase.auth
-            .signUp({
-              email,
-              password,
-              options: {
-                emailRedirectTo: `${window.location.origin}/login`,
-              },
-            })
-            .then(({ error }) => {
-              if (error) {
-                notifyError("이메일/비밀번호를 확인해주세요.");
-              } else {
-                console.log("Login successful");
-                router.push("/welcome");
-              }
-            });
-        }}
         type="submit"
       >
         회원가입
@@ -114,7 +118,7 @@ const SignUpForm = () => {
           로그인
         </Link>
       </h1>
-    </div>
+    </form>
   );
 };
 

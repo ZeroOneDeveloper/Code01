@@ -67,9 +67,6 @@ const LoginForm = () => {
           Email address
         </label>
         <input
-          id="email"
-          name="email"
-          autoComplete="email"
           className="w-full dark:bg-[#28282d] text-black dark:text-white px-4 py-2 shadow-md rounded-lg border-2 border-gray-200 dark:border-gray-400/30 focus:outline-none dark:focus:border-gray-300 transition-colors"
           type="email"
           value={email}
@@ -82,9 +79,6 @@ const LoginForm = () => {
           Password
         </label>
         <input
-          id="password"
-          name="password"
-          autoComplete="current-password"
           className="w-full dark:bg-[#28282d] text-black dark:text-white px-4 py-2 shadow-md rounded-lg border-2 border-gray-200 dark:border-gray-400/30 focus:outline-none dark:focus:border-gray-300 transition-colors"
           type="password"
           value={password}
