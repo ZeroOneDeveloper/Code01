@@ -52,6 +52,7 @@ export interface Problem {
   time_limit: number;
   memory_limit: number;
   organization_id: number;
+  deadline?: string | null;
 }
 
 export enum SubmissionStatus {

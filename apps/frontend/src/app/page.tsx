@@ -81,27 +81,6 @@ export default async function Home() {
             </div>
           </div>
         ))}
-        {/*{Object.entries(grouped).map(([orgId, group]) => (*/}
-        {/*  <div key={orgId}>*/}
-        {/*    <h2 className="text-2xl font-bold mb-4">*/}
-        {/*      {group.organization.name}*/}
-        {/*    </h2>*/}
-        {/*    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">*/}
-        {/*      /!*{group.problems.map((problem) => (*!/*/}
-        {/*      /!*  <ProblemCard*!/*/}
-        {/*      /!*    key={problem.id}*!/*/}
-        {/*      /!*    problem={problem}*!/*/}
-        {/*      /!*    href={`/problem/${problem.id}`}*!/*/}
-        {/*      /!*  />*!/*/}
-        {/*      /!*))}*!/*/}
-        {/*      <ProblemCard*/}
-        {/*        key={group.id}*/}
-        {/*        problem={group}*/}
-        {/*        href={`/problem/${group.id}`}*/}
-        {/*      />*/}
-        {/*    </div>*/}
-        {/*  </div>*/}
-        {/*))}*/}
       </div>
     );
   }

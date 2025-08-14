@@ -68,6 +68,7 @@ const SignUpForm = () => {
       });
 
       if (error) {
+        console.log(error);
         notifyError("이메일/비밀번호를 확인해주세요.");
         return;
       }
