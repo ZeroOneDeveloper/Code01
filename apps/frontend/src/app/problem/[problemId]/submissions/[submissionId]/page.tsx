@@ -28,9 +28,6 @@ const SubmissionCodePage: React.FC = () => {
   const [minimapEnabled, setMinimapEnabled] = useState(false);
   const [fontSize, setFontSize] = useState(14);
   const [editorHeight, setEditorHeight] = useState<`${number}vh`>("30vh");
-  // --- Case/tab controls and computed helpers
-  const [activeTab, setActiveTab] = useState<"stdout" | "stderr">("stdout");
-  const [caseIndex, setCaseIndex] = useState<number>(0);
 
   const totalCases = submission?.cases_total ?? 0;
   const doneCases = submission?.cases_done ?? 0;
@@ -41,30 +38,13 @@ const SubmissionCodePage: React.FC = () => {
   }, [doneCases, totalCases]);
 
   const timeText = useMemo(
-    () => `${submission?.time_ms ?? "-"} ms`,
+    () => (submission?.time_ms ? `${submission.time_ms} ms` : "제한없음"),
     [submission?.time_ms],
   );
   const memoryText = useMemo(
-    () => `${submission?.memory_kb ?? "-"} KB`,
+    () => (submission?.memory_kb ? `${submission.memory_kb} KB` : "제한없음"),
     [submission?.memory_kb],
   );
-  useEffect(() => {
-    if (!submission) return;
-    const outLen = Array.isArray(submission.stdout_list)
-      ? submission.stdout_list.length
-      : 0;
-    const errLen = Array.isArray(submission.stderr_list)
-      ? submission.stderr_list.length
-      : 0;
-    const maxLen = Math.max(outLen, errLen);
-    if (maxLen > 0) {
-      setCaseIndex(
-        Math.max(0, Math.min(maxLen - 1, (submission.cases_done ?? 1) - 1)),
-      );
-    } else {
-      setCaseIndex(0);
-    }
-  }, [submission]);
 
   useEffect(() => {
     const fetchProblem = async () => {
@@ -82,7 +62,8 @@ const SubmissionCodePage: React.FC = () => {
       }
     };
     fetchProblem();
-  }, [params.problemId]);
+  }, [params.problemId, supabase]);
+
   useEffect(() => {
     if (submission?.code) {
       setCode(submission.code);
@@ -98,7 +79,7 @@ const SubmissionCodePage: React.FC = () => {
           "(prefers-color-scheme: dark)",
         ).matches;
         setEditorTheme(prefersDark ? "vs-dark" : "vs");
-      } catch (_) {
+      } catch {
         setEditorTheme("vs-dark");
       }
     }
@@ -132,7 +113,7 @@ const SubmissionCodePage: React.FC = () => {
     };
 
     fetchUser();
-  }, []);
+  }, [supabase]);
 
   useEffect(() => {
     const fetchSubmission = async () => {
@@ -158,7 +139,7 @@ const SubmissionCodePage: React.FC = () => {
     };
 
     fetchSubmission();
-  }, [params.problemId, params.submissionId]);
+  }, [params.problemId, params.submissionId, supabase]);
 
   // Wait until both fetches finish (user may be null if not logged in)
   if (!userLoaded || !submissionLoaded) {
@@ -223,7 +204,7 @@ const SubmissionCodePage: React.FC = () => {
             <span className="hidden sm:inline">·</span>
             {submission?.submitted_at && (
               <span>
-                제출 {new Date(submission.submitted_at as any).toLocaleString()}
+                제출 {new Date(submission.submitted_at).toLocaleString()}
               </span>
             )}
             <span className="hidden sm:inline">·</span>

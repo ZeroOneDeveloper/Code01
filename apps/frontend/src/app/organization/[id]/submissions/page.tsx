@@ -3,8 +3,21 @@
 import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
+
 import { createClient } from "@lib/supabase/client";
 import { Problem, Submission, toStatusKo } from "@lib/types";
+
+type StatusFilter =
+  | "all"
+  | "accepted"
+  | "wrong"
+  | "tle"
+  | "mle"
+  | "ce"
+  | "re"
+  | "pending";
+
+type UserNick = { id: string; nickname: string | null };
 
 const SubmissionsPage: React.FC = () => {
   const params = useParams<{ id: string }>();
@@ -26,12 +39,7 @@ const SubmissionsPage: React.FC = () => {
       ? Number(searchParams.get("problemId"))
       : "all",
   );
-  const [onlyMine, setOnlyMine] = useState<boolean>(
-    searchParams.get("userOnly") === "1",
-  );
-  const [statusFilter, setStatusFilter] = useState<
-    "all" | "accepted" | "wrong" | "tle" | "mle" | "ce" | "re" | "pending"
-  >("all");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
 
   // Load current user id
   useEffect(() => {
@@ -57,7 +65,7 @@ const SubmissionsPage: React.FC = () => {
         setLoading(false);
         return;
       }
-      setProblems(data as any as Pick<Problem, "id" | "title">[]);
+      setProblems((data ?? []) as Pick<Problem, "id" | "title">[]);
       setLoading(false);
     })();
   }, [orgId, supabase]);
@@ -74,7 +82,7 @@ const SubmissionsPage: React.FC = () => {
         selectedProblemId === "all"
           ? problems.map((p) => p.id)
           : [Number(selectedProblemId)]
-      ).filter((x) => typeof x === "number" && !Number.isNaN(x));
+      ).filter((x) => !Number.isNaN(x));
 
       if (problemIds.length === 0) {
         setSubmissions([]);
@@ -83,15 +91,11 @@ const SubmissionsPage: React.FC = () => {
         return;
       }
 
-      let query = supabase
+      const query = supabase
         .from("problem_submissions")
         .select("*")
         .in("problem_id", problemIds)
         .order("submitted_at", { ascending: false });
-
-      if (onlyMine && currentUserId) {
-        query = query.eq("user_id", currentUserId);
-      }
 
       const { data, error } = await query;
       if (error) {
@@ -102,19 +106,19 @@ const SubmissionsPage: React.FC = () => {
         return;
       }
 
-      const rows = data as any as Submission[];
+      const rows = (data ?? []) as Submission[];
 
       // Client-side status filter (best effort; 프로젝트 정의에 맞게 조정 가능)
       const filtered = rows.filter((s) => {
         switch (statusFilter) {
           case "accepted":
-            return s.is_correct === true;
+            return s.is_correct;
           case "wrong":
-            return s.is_correct === false && String(s.status_code) !== "0";
+            return !s.is_correct && String(s.status_code) !== "0";
           case "tle":
-            return s.passed_time_limit === false;
+            return !s.passed_time_limit;
           case "mle":
-            return s.passed_memory_limit === false;
+            return !s.passed_memory_limit;
           case "ce":
             return (
               String(s.status_code).includes("Compilation") ||
@@ -145,8 +149,9 @@ const SubmissionsPage: React.FC = () => {
           .select("id, nickname")
           .in("id", userIds);
         if (!userErr && users) {
+          const userList = users as UserNick[];
           setNicknames(
-            Object.fromEntries(users.map((u: any) => [u.id, u.nickname])),
+            Object.fromEntries(userList.map((u) => [u.id, u.nickname ?? ""])),
           );
         }
       } else {
@@ -161,7 +166,6 @@ const SubmissionsPage: React.FC = () => {
     orgId,
     problems,
     selectedProblemId,
-    onlyMine,
     statusFilter,
     currentUserId,
     supabase,
@@ -222,7 +226,7 @@ const SubmissionsPage: React.FC = () => {
           <select
             className="rounded-md border px-2 py-1 text-sm"
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as any)}
+            onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
           >
             <option value="all">전체</option>
             <option value="accepted">정답</option>

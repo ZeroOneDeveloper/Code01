@@ -26,27 +26,23 @@ const Detail: React.FC<{
 const CardInner: React.FC<{ problem: Problem }> = ({ problem }) => {
   const hasDeadline = !!problem.deadline;
   const date = hasDeadline
-    ? new Date(problem.deadline as any)
-    : new Date((problem as any).published_at);
+    ? new Date(problem.deadline as string)
+    : new Date(problem.published_at);
   const datePrefix = hasDeadline ? "마감" : "게시일";
 
   return (
     <>
       <h1 className="text-left text-xl font-bold truncate">{problem.title}</h1>
       <div className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-2">
-        <Detail icon={LinkIcon}>{(problem as any).id}</Detail>
+        <Detail icon={LinkIcon}>{problem.id}</Detail>
         <Detail icon={Calendar}>
           {datePrefix} · {formatKoreanDate(date)}
         </Detail>
         <Detail icon={Timer}>
-          {(problem as any).time_limit
-            ? `${(problem as any).time_limit} ms`
-            : "제한없음"}
+          {problem.time_limit ? `${problem.time_limit} ms` : "제한없음"}
         </Detail>
         <Detail icon={MemoryStick}>
-          {(problem as any).memory_limit
-            ? `${(problem as any).memory_limit} MB`
-            : "제한없음"}
+          {problem.memory_limit ? `${problem.memory_limit} MB` : "제한없음"}
         </Detail>
       </div>
     </>
