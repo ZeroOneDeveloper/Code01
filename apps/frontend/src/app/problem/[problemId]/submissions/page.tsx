@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 
-import { Submission, SubmissionStatus } from "@lib/types";
+import { Submission, toStatusKo } from "@lib/types";
 import type { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 import { createClient } from "@lib/supabase/client";
 
@@ -19,31 +19,6 @@ const labels = [
   "제출한 시간",
 ];
 
-// 결과 코드 한글 변환 (SubmissionStatus 기반)
-const toStatusKo = (code: unknown): string => {
-  const n = typeof code === "number" ? code : Number(code);
-  switch (n) {
-    case SubmissionStatus.Pending:
-      return "대기중";
-    case SubmissionStatus.Accepted:
-      return "정답";
-    case SubmissionStatus.WrongAnswer:
-      return "오답";
-    case SubmissionStatus.TimeLimitExceeded:
-      return "시간 초과";
-    case SubmissionStatus.MemoryLimitExceeded:
-      return "메모리 초과";
-    case SubmissionStatus.RuntimeError:
-      return "런타임 에러";
-    case SubmissionStatus.CompilationError:
-      return "컴파일 에러";
-    case SubmissionStatus.InternalError:
-      return "시스템 에러";
-    default:
-      return "알 수 없음";
-  }
-};
-
 // DB row shape including transient judge fields delivered via realtime/polling
 type SubmissionRow = Submission & {
   cases_done?: number | null;
@@ -54,10 +29,11 @@ type SubmissionRow = Submission & {
 };
 
 const SubmissionsPage: React.FC = () => {
-  const params = useParams<{ id: string }>();
+  const params = useParams<{ problemId: string }>();
   const searchParams = useSearchParams();
   const [submissions, setSubmissions] = useState<SubmissionRow[]>([]);
   const [nicknames, setNicknames] = useState<Record<string, string>>({});
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const pendingParam =
     searchParams.get("pending_id") ?? searchParams.get("pendingId") ?? null;
   const pendingIdNum = pendingParam ? Number(pendingParam) : null;
@@ -97,11 +73,12 @@ const SubmissionsPage: React.FC = () => {
       const {
         data: { user },
       } = await supabase.auth.getUser();
+      setCurrentUserId(user?.id ?? null);
 
       let query = supabase
         .from("problem_submissions")
         .select("*")
-        .eq("problem_id", params.id)
+        .eq("problem_id", params.problemId)
         .order("submitted_at", { ascending: false });
 
       if (onlyMine && user?.id) {
@@ -136,7 +113,7 @@ const SubmissionsPage: React.FC = () => {
     };
 
     fetchSubmissions();
-  }, [params.id, searchKey, onlyMine]);
+  }, [params.problemId, searchKey, onlyMine]);
 
   useEffect(() => {
     const supabase = createClient();
@@ -262,7 +239,20 @@ const SubmissionsPage: React.FC = () => {
                   resultText,
                   `${s.memory_kb ?? "-"} KB`,
                   `${s.time_ms ?? "-"} ms`,
-                  ["조회", `/problem/${s.problem_id}/submission/${s.id}`],
+                  s.user_id === currentUserId ? (
+                    ["조회", `/problem/${s.problem_id}/submissions/${s.id}`]
+                  ) : (
+                    <span
+                      className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs text-muted-foreground"
+                      title="내 제출물만 열람 가능합니다."
+                    >
+                      <span aria-hidden>🔒</span>
+                      <span>열람 제한</span>
+                      <span className="sr-only">
+                        내 제출물만 열람 가능합니다.
+                      </span>
+                    </span>
+                  ),
                   `${s.code.length} 자`,
                   new Date(s.submitted_at).toLocaleString("ko-KR", {
                     timeZone: "Asia/Seoul",
@@ -270,13 +260,15 @@ const SubmissionsPage: React.FC = () => {
                 ];
               })().map((v, i) => (
                 <td key={i} className="p-2 text-center">
-                  {typeof v === "object" ? (
+                  {Array.isArray(v) ? (
                     <Link
                       href={v[1]}
                       className="font-semibold cursor-pointer text-blue-600 dark:text-blue-400 hover:underline"
                     >
                       {v[0]}
                     </Link>
+                  ) : React.isValidElement(v) ? (
+                    v
                   ) : (
                     v
                   )}

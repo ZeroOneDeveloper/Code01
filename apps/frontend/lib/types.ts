@@ -65,3 +65,27 @@ export enum SubmissionStatus {
   CompilationError = 6,
   InternalError = 7,
 }
+
+export const toStatusKo = (code: number | string): string => {
+  const n = typeof code === "number" ? code : Number(code);
+  switch (n) {
+    case SubmissionStatus.Pending:
+      return "대기중";
+    case SubmissionStatus.Accepted:
+      return "정답";
+    case SubmissionStatus.WrongAnswer:
+      return "오답";
+    case SubmissionStatus.TimeLimitExceeded:
+      return "시간 초과";
+    case SubmissionStatus.MemoryLimitExceeded:
+      return "메모리 초과";
+    case SubmissionStatus.RuntimeError:
+      return "런타임 에러";
+    case SubmissionStatus.CompilationError:
+      return "컴파일 에러";
+    case SubmissionStatus.InternalError:
+      return "시스템 에러";
+    default:
+      return "알 수 없음";
+  }
+};

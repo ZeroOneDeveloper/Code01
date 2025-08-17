@@ -3,7 +3,8 @@
 import React, { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
 
-import { X } from "lucide-react";
+import { X, CalendarClock } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 import Editor from "@monaco-editor/react";
 import { User } from "@supabase/auth-js";
 import { motion, AnimatePresence } from "framer-motion";
@@ -16,9 +17,24 @@ function isValidDate(dateStr: string) {
   return !isNaN(date.getTime());
 }
 
+function toInputLocal(dateIso: string | null | undefined) {
+  if (!dateIso) return "";
+  try {
+    return new Date(dateIso).toLocaleString("sv-SE", {
+      timeZone: "Asia/Seoul",
+    });
+  } catch {
+    return "";
+  }
+}
+
 const NewProblemPage = () => {
   const supabase = createClient();
   const [user, setUser] = useState<User | null>(null);
+  const searchParams = useSearchParams();
+  const [isEditing, setIsEditing] = useState(false);
+  const [editProblemId, setEditProblemId] = useState<number | null>(null);
+  const [loadingExisting, setLoadingExisting] = useState(false);
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -52,6 +68,9 @@ int main(void) {
   const [conditions, setConditions] = useState<string[]>([""]);
   const [examplePairs, setExamplePairs] = useState([{ input: "", output: "" }]);
 
+  const [hasDeadline, setHasDeadline] = useState(false);
+  const [deadline, setDeadline] = useState("");
+
   const [editorTheme, setEditorTheme] = useState("light");
   const { theme } = useTheme();
 
@@ -84,9 +103,94 @@ int main(void) {
     setEditorTheme(theme === "dark" ? "vs-dark" : "light");
   }, [theme]);
 
+  useEffect(() => {
+    const idStr = searchParams.get("id");
+    if (!idStr) return;
+    const idNum = Number(idStr);
+    if (Number.isNaN(idNum)) return;
+
+    setLoadingExisting(true);
+    setEditProblemId(idNum);
+
+    (async () => {
+      const { data, error } = await supabase
+        .from("problems")
+        .select(
+          "id, title, description, published_at, created_by, input_description, output_description, conditions, sample_inputs, sample_outputs, default_code, time_limit, memory_limit, organization_id, deadline",
+        )
+        .eq("id", idNum)
+        .single();
+
+      if (error || !data) {
+        toast.error("문제를 불러오지 못했습니다.", {
+          position: "top-right",
+          autoClose: 3000,
+          hideProgressBar: true,
+          closeOnClick: true,
+          pauseOnHover: true,
+          draggable: true,
+          theme: theme === "dark" ? "dark" : "light",
+          transition: Bounce,
+        });
+        setLoadingExisting(false);
+        return;
+      }
+
+      setIsEditing(true);
+      setTitle(data.title ?? "");
+      setDescription(data.description ?? "");
+      setPublishedAt(data.published_at ? toInputLocal(data.published_at) : "");
+      setInputDescription(data.input_description ?? "");
+      setOutputDescription(data.output_description ?? "");
+      setConditions(
+        Array.isArray(data.conditions) && data.conditions.length
+          ? data.conditions
+          : [""],
+      );
+
+      const si = Array.isArray(data.sample_inputs) ? data.sample_inputs : [];
+      const so = Array.isArray(data.sample_outputs) ? data.sample_outputs : [];
+      const maxLen = Math.max(si.length, so.length);
+      setExamplePairs(
+        (maxLen ? Array.from({ length: maxLen }) : [{}]).map((_, i) => ({
+          input: si[i] ?? "",
+          output: so[i] ?? "",
+        })) as { input: string; output: string }[],
+      );
+
+      setCode(data.default_code ?? "");
+      setTimeLimit(
+        typeof data.time_limit === "number" ? data.time_limit : null,
+      );
+      setMemoryLimit(
+        typeof data.memory_limit === "number" ? data.memory_limit : null,
+      );
+
+      const has = !!data.deadline;
+      setHasDeadline(has);
+      setDeadline(has && data.deadline ? toInputLocal(data.deadline) : "");
+
+      toast.success("기존 문제를 불러왔어요.", {
+        position: "top-right",
+        autoClose: 1400,
+        hideProgressBar: true,
+        closeOnClick: true,
+        theme: theme === "dark" ? "dark" : "light",
+        transition: Bounce,
+      });
+
+      setLoadingExisting(false);
+    })();
+  }, [searchParams, supabase, theme]);
+
   return (
     <div className="relative min-h-screen flex flex-col justify-between">
       <div className="flex flex-col justify-center gap-8 p-6">
+        {isEditing && (
+          <div className="mb-2 rounded-md border border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-950 p-3 text-sm">
+            현재 <strong>문제 #{editProblemId}</strong> 수정 중입니다.
+          </div>
+        )}
         <div className="flex flex-col gap-4">
           <h1 className="text-2xl font-bold">제목</h1>
           <input
@@ -114,6 +218,40 @@ int main(void) {
             value={publishedAt}
             onChange={(e) => setPublishedAt(e.target.value)}
           />
+        </div>
+        <div className="flex flex-col gap-4">
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            <CalendarClock className="w-6 h-6" />
+            마감 기한 (선택)
+          </h1>
+          <div className="flex items-center gap-3">
+            <label className="inline-flex items-center gap-2 select-none">
+              <input
+                type="checkbox"
+                checked={hasDeadline}
+                onChange={(e) => setHasDeadline(e.target.checked)}
+                className="h-4 w-4 rounded border-gray-300 dark:border-gray-600"
+              />
+              <span className="text-sm text-gray-700 dark:text-gray-300">
+                {hasDeadline ? "마감 설정됨" : "마감 없음"}
+              </span>
+            </label>
+          </div>
+          <AnimatePresence>
+            {hasDeadline && (
+              <motion.input
+                key="deadline-input"
+                initial={{ opacity: 0, y: -6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                transition={{ duration: 0.15 }}
+                type="datetime-local"
+                className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-black dark:text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200"
+                value={deadline}
+                onChange={(e) => setDeadline(e.target.value)}
+              />
+            )}
+          </AnimatePresence>
         </div>
         <div className="flex flex-col gap-4">
           <h1 className="text-2xl font-bold">조건</h1>
@@ -327,7 +465,11 @@ int main(void) {
           버튼을 눌러 문제를 등록하세요.
         </div>
         <button
-          className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition self-end md:self-auto"
+          disabled={loadingExisting}
+          className={
+            "bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition self-end md:self-auto" +
+            (loadingExisting ? " opacity-60 cursor-not-allowed" : "")
+          }
           onClick={async () => {
             if (
               !title ||
@@ -362,6 +504,7 @@ int main(void) {
                 theme: theme === "dark" ? "dark" : "light",
                 transition: Bounce,
               });
+              return;
             }
 
             if (!examplePairs.every((e) => e.output.trim() !== "")) {
@@ -394,22 +537,89 @@ int main(void) {
               return;
             }
 
-            await supabase.from("problems").insert({
+            if (hasDeadline && !isValidDate(deadline)) {
+              toast.error("유효한 마감 기한을 입력하세요.", {
+                position: "top-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: false,
+                pauseOnHover: true,
+                draggable: true,
+                progress: undefined,
+                theme: theme === "dark" ? "dark" : "light",
+                transition: Bounce,
+              });
+              return;
+            }
+
+            const payload = {
               title,
               description,
               created_by: user?.id,
               input_description: inputDescription,
               output_description: outputDescription,
+              conditions,
               sample_inputs: examplePairs.map((pair) => pair.input),
               sample_outputs: examplePairs.map((pair) => pair.output),
               time_limit: timeLimit,
               memory_limit: memoryLimit,
               published_at: new Date(publishedAt).toISOString(),
               default_code: code,
-            });
+              deadline: hasDeadline ? new Date(deadline).toISOString() : null,
+            };
+
+            if (isEditing && editProblemId) {
+              const { error } = await supabase
+                .from("problems")
+                .update({
+                  ...payload,
+                })
+                .eq("id", editProblemId);
+
+              if (error) {
+                toast.error("수정 중 오류가 발생했습니다.", {
+                  position: "top-right",
+                  autoClose: 3000,
+                  hideProgressBar: true,
+                  closeOnClick: true,
+                  theme: theme === "dark" ? "dark" : "light",
+                  transition: Bounce,
+                });
+              } else {
+                toast.success("수정이 완료되었습니다.", {
+                  position: "top-right",
+                  autoClose: 1400,
+                  hideProgressBar: true,
+                  closeOnClick: true,
+                  theme: theme === "dark" ? "dark" : "light",
+                  transition: Bounce,
+                });
+              }
+            } else {
+              const { error } = await supabase.from("problems").insert(payload);
+              if (error) {
+                toast.error("생성 중 오류가 발생했습니다.", {
+                  position: "top-right",
+                  autoClose: 3000,
+                  hideProgressBar: true,
+                  closeOnClick: true,
+                  theme: theme === "dark" ? "dark" : "light",
+                  transition: Bounce,
+                });
+              } else {
+                toast.success("문제가 생성되었습니다.", {
+                  position: "top-right",
+                  autoClose: 1400,
+                  hideProgressBar: true,
+                  closeOnClick: true,
+                  theme: theme === "dark" ? "dark" : "light",
+                  transition: Bounce,
+                });
+              }
+            }
           }}
         >
-          생성
+          {isEditing ? "수정" : "생성"}
         </button>
       </div>
     </div>

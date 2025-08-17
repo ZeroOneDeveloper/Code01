@@ -6,16 +6,16 @@ import ProblemSubmitForm from "@components/hero/ProblemSubmitForm";
 const isNumeric = (value: string) => /^\d+$/.test(value);
 
 const ProblemSubmitPage: React.FC<{
-  params: Promise<{ id: string }>;
+  params: Promise<{ problemId: string }>;
 }> = async ({ params }) => {
   const supabase = await createClient();
 
-  const { id } = await params;
+  const { problemId } = await params;
 
   const { data } = await supabase
     .from("problems")
     .select("*")
-    .eq("id", isNumeric(id) ? parseInt(id, 10) : id)
+    .eq("id", isNumeric(problemId) ? parseInt(problemId, 10) : problemId)
     .maybeSingle();
 
   const userId = (await supabase.auth.getUser()).data.user!.id;
@@ -30,7 +30,7 @@ const ProblemSubmitPage: React.FC<{
 
       <ProblemSubmitForm
         userId={userId}
-        problemId={id}
+        problemId={problemId}
         defaultCode={data.default_code}
       />
     </div>

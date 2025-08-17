@@ -15,17 +15,17 @@ export default async function ProblemPageLayout({
   params,
   children,
 }: Readonly<{
-  params: Promise<{ id: string }>;
+  params: Promise<{ problemId: string }>;
   children: React.ReactNode;
 }>) {
   const supabase = await createClient();
 
-  const { id } = await params;
+  const { problemId } = await params;
 
   const { data, error } = await supabase
     .from("problems")
     .select("*")
-    .eq("id", isNaN(Number(id)) ? id : parseInt(id, 10))
+    .eq("id", isNaN(Number(problemId)) ? problemId : parseInt(problemId, 10))
     .maybeSingle();
 
   if (error || !data) {

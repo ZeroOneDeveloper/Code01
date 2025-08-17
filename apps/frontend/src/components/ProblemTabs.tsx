@@ -9,7 +9,7 @@ import {
 } from "next/navigation";
 
 const ProblemTabs: React.FC = () => {
-  const { id } = useParams<{ id: string }>();
+  const { problemId } = useParams<{ problemId: string }>();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -18,27 +18,27 @@ const ProblemTabs: React.FC = () => {
     <div className="flex gap-1">
       {[
         {
-          label: `${id}번`,
-          href: `/problem/${id}`,
-          isActive: pathname === `/problem/${id}`,
+          label: `${problemId}번`,
+          href: `/problem/${problemId}`,
+          isActive: pathname === `/problem/${problemId}`,
         },
         {
           label: "제출",
-          href: `/problem/${id}/submit`,
-          isActive: pathname === `/problem/${id}/submit`,
+          href: `/problem/${problemId}/submit`,
+          isActive: pathname === `/problem/${problemId}/submit`,
         },
         {
           label: "내 제출",
-          href: `/problem/${id}/submissions?user_id=true`,
+          href: `/problem/${problemId}/submissions?user_id=true`,
           isActive:
-            pathname === `/problem/${id}/submissions` &&
+            pathname === `/problem/${problemId}/submissions` &&
             searchParams.get("user_id") === "true",
         },
         {
           label: "제출 기록",
-          href: `/problem/${id}/submissions`,
+          href: `/problem/${problemId}/submissions`,
           isActive:
-            pathname === `/problem/${id}/submissions` &&
+            pathname === `/problem/${problemId}/submissions` &&
             !searchParams.get("user_id"),
         },
       ].map((item, index) => (

@@ -14,16 +14,16 @@ const NotFoundProblem: React.FC = () => {
 };
 
 const ProblemPage: React.FC<{
-  params: Promise<{ id: string }>;
+  params: Promise<{ problemId: string }>;
 }> = async ({ params }) => {
   const supabase = await createClient();
 
-  const { id } = await params;
+  const { problemId } = await params;
 
   const { data } = await supabase
     .from("problems")
     .select("*")
-    .eq("id", isNumeric(id) ? parseInt(id, 10) : id)
+    .eq("id", isNumeric(problemId) ? parseInt(problemId, 10) : problemId)
     .maybeSingle();
 
   const creator = await supabase
