@@ -8,17 +8,17 @@ export default async function OrganizationManagementLayout({
   params,
   children,
 }: Readonly<{
-  params: Promise<{ id: string }>;
+  params: Promise<{ organizationId: string }>;
   children: React.ReactNode;
 }>) {
   const supabase = await createClient();
 
-  const { id } = await params;
+  const { organizationId } = await params;
 
   const { data: organization, error } = await supabase
     .from("organizations")
     .select("*")
-    .eq("id", id)
+    .eq("id", organizationId)
     .maybeSingle();
   if (error || !organization) {
     console.error("Error fetching organization:", error);
@@ -40,7 +40,7 @@ export default async function OrganizationManagementLayout({
   const { data: member } = await supabase
     .from("organization_members")
     .select("*")
-    .eq("organization_id", id)
+    .eq("organization_id", organizationId)
     .eq("user_id", user.id)
     .maybeSingle();
 

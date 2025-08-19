@@ -13,7 +13,7 @@ import { Organization, UserProfile } from "@lib/types";
 import { createClient } from "@lib/supabase/client";
 
 const OrganizationManagementPage: React.FC = () => {
-  const { id } = useParams<{ id: string }>();
+  const { organizationId } = useParams<{ organizationId: string }>();
   const { theme } = useTheme();
 
   const supabase = createClient();
@@ -52,7 +52,7 @@ const OrganizationManagementPage: React.FC = () => {
     const { data: membersData, error } = await supabase
       .from("organization_members")
       .select("*")
-      .eq("organization_id", id);
+      .eq("organization_id", organizationId);
 
     if (error) {
       console.error("Error fetching members:", error);
@@ -97,7 +97,7 @@ const OrganizationManagementPage: React.FC = () => {
         }[],
       );
     }
-  }, [supabase, id]);
+  }, [supabase, organizationId]);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -121,7 +121,7 @@ const OrganizationManagementPage: React.FC = () => {
       const { data: organization, error } = await supabase
         .from("organizations")
         .select("*")
-        .eq("id", id)
+        .eq("id", organizationId)
         .maybeSingle();
 
       if (error) {
@@ -134,7 +134,7 @@ const OrganizationManagementPage: React.FC = () => {
     };
 
     fetchOrganization();
-  }, [supabase, id]);
+  }, [supabase, organizationId]);
 
   useEffect(() => {
     fetchMembers();
@@ -176,7 +176,7 @@ const OrganizationManagementPage: React.FC = () => {
         .from("organization_members")
         .delete()
         .eq("user_id", modal.userId)
-        .eq("organization_id", id);
+        .eq("organization_id", organizationId);
       toast.success("정상적으로 유저를 삭제했습니다.", {
         position: "top-right",
         autoClose: 5000,
@@ -194,7 +194,7 @@ const OrganizationManagementPage: React.FC = () => {
         .from("organization_members")
         .update({ role: newRole })
         .eq("user_id", modal.userId)
-        .eq("organization_id", id);
+        .eq("organization_id", organizationId);
       toast.success(
         `정상적으로 ${newRole === "admin" ? "관리자" : "일반 멤버"}로 변경했습니다.`,
         {
@@ -213,7 +213,7 @@ const OrganizationManagementPage: React.FC = () => {
 
     setModal(null);
     fetchMembers();
-  }, [modal, id, supabase, theme, fetchMembers]);
+  }, [modal, organizationId, supabase, theme, fetchMembers]);
 
   if (!organization) {
     return (
@@ -454,7 +454,7 @@ const OrganizationManagementPage: React.FC = () => {
                     onClick={async () => {
                       for (const userId of selectedUserIds) {
                         await supabase.from("organization_members").insert({
-                          organization_id: id,
+                          organization_id: organizationId,
                           user_id: userId,
                           role: "member",
                         });

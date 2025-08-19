@@ -6,12 +6,12 @@ import { Problem } from "@lib/types";
 import ProblemCard from "@components/ProblemCard";
 import { createClient } from "@lib/supabase/server";
 
-const ProblemsPage: React.FC<{ params: Promise<{ id: string }> }> = async ({
-  params,
-}) => {
+const ProblemsPage: React.FC<{
+  params: Promise<{ organizationId: string }>;
+}> = async ({ params }) => {
   const supabase = await createClient();
 
-  const { id } = await params;
+  const { organizationId } = await params;
 
   const { data: problems, error } = await supabase
     .from("problems")
@@ -34,7 +34,7 @@ const ProblemsPage: React.FC<{ params: Promise<{ id: string }> }> = async ({
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">문제 목록</h1>
         <Link
-          href={`/organization/${id}/problems/new`}
+          href={`/organization/${organizationId}/problems/new`}
           className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
         >
           새 문제 만들기
@@ -46,7 +46,7 @@ const ProblemsPage: React.FC<{ params: Promise<{ id: string }> }> = async ({
           <ProblemCard
             key={problem.id}
             problem={problem}
-            href={`/organization/${id}/problems/new?id=${problem.id}`}
+            href={`/organization/${organizationId}/problems/new?id=${problem.id}`}
           />
         ))}
       </div>

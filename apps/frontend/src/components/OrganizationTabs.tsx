@@ -4,7 +4,7 @@ import React from "react";
 import { useParams, usePathname, useRouter } from "next/navigation";
 
 const OrganizationTabs: React.FC = () => {
-  const { id } = useParams<{ id: string }>();
+  const { organizationId } = useParams<{ organizationId: string }>();
   const router = useRouter();
   const pathname = usePathname();
 
@@ -13,18 +13,25 @@ const OrganizationTabs: React.FC = () => {
       {[
         {
           label: "유저",
-          href: `/organization/${id}`,
-          isActive: pathname === `/organization/${id}`,
+          href: `/organization/${organizationId}`,
+          isActive: pathname === `/organization/${organizationId}`,
         },
         {
           label: "문제",
-          href: `/organization/${id}/problems`,
-          isActive: pathname === `/organization/${id}/problems`,
+          href: `/organization/${organizationId}/problems`,
+          isActive: pathname === `/organization/${organizationId}/problems`,
+        },
+        {
+          label: "퀴즈",
+          href: `/organization/${organizationId}/quizzes`,
+          isActive: pathname.startsWith(
+            `/organization/${organizationId}/quizzes`,
+          ),
         },
         {
           label: "제출 기록",
-          href: `/organization/${id}/submissions`,
-          isActive: pathname === `/organization/${id}/submissions`,
+          href: `/organization/${organizationId}/submissions`,
+          isActive: pathname === `/organization/${organizationId}/submissions`,
         },
       ].map((item, index) => (
         <button

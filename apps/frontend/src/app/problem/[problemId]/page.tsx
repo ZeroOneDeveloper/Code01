@@ -39,11 +39,70 @@ const ProblemPage: React.FC<{
 
   data.creator = creator.data.name;
 
-  return (
-    <div className="flex flex-col gap-8">
-      <h1 className="text-4xl font-bold">{data.title}</h1>
+  const formatKoreanDate = (iso?: string | null) => {
+    if (!iso) return "-";
+    try {
+      return new Date(iso).toLocaleDateString("ko-KR", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      });
+    } catch {
+      return "-";
+    }
+  };
 
-      <div className="w-full grid grid-cols-3 md:grid-cols-6 text-center">
+  const publishedNode = data.published_at ? (
+    <span className="text-sky-400">{formatKoreanDate(data.published_at)}</span>
+  ) : (
+    "-"
+  );
+
+  const deadlineNode = data.deadline ? (
+    (() => {
+      const d = new Date(data.deadline as string);
+      const now = new Date();
+      const diffDays = Math.ceil(
+        (d.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
+      );
+      if (d.getTime() < now.getTime()) {
+        return (
+          <span className="text-rose-400">
+            {formatKoreanDate(data.deadline)} · 마감됨
+          </span>
+        );
+      }
+      return (
+        <span className="text-rose-400">
+          {formatKoreanDate(data.deadline)} · D-{diffDays}
+        </span>
+      );
+    })()
+  ) : (
+    <span className="text-gray-400">제한없음</span>
+  );
+
+  const isPastDeadline = (() => {
+    if (!data.deadline) return false;
+    try {
+      const d = new Date(data.deadline as string);
+      return d.getTime() < Date.now();
+    } catch {
+      return false;
+    }
+  })();
+
+  return (
+    <div className="mx-auto w-full max-w-5xl px-4 flex flex-col gap-8">
+      <h1 className="text-4xl font-bold">{data.title}</h1>
+      {isPastDeadline && (
+        <div className="rounded-md border border-rose-500/40 bg-rose-500/10 text-rose-200 px-4 py-3">
+          이 문제는 <span className="font-semibold">마감</span>되었습니다. 더
+          이상 제출할 수 없습니다.
+        </div>
+      )}
+
+      <div className="w-full grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 text-center gap-2 md:gap-4">
         {[
           {
             label: "시간 제한",
@@ -62,15 +121,23 @@ const ProblemPage: React.FC<{
             label: "정답 비율",
             value: data.correct_rate != null ? `${data.correct_rate}%` : "-",
           },
+          {
+            label: "게시일",
+            value: publishedNode,
+          },
+          {
+            label: "마감",
+            value: deadlineNode,
+          },
         ].map((item, idx) => (
           <div
             key={idx}
-            className="px-2 py-2 flex flex-col items-center justify-center border-b border-gray-700"
+            className={`px-2 py-2 flex flex-col items-center justify-center border-b border-gray-700 ${idx >= 6 ? "col-span-2 sm:col-span-3 md:col-span-3" : ""}`}
           >
             <div className="text-xs text-gray-400 whitespace-nowrap">
               {item.label}
             </div>
-            <div className="text-base font-medium min-h-[28px]">
+            <div className="text-base font-medium min-h-[28px] whitespace-nowrap">
               {item.value}
             </div>
           </div>

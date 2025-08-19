@@ -2,9 +2,9 @@
 
 import React, { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import { X, CalendarClock } from "lucide-react";
-import { useSearchParams } from "next/navigation";
 import Editor from "@monaco-editor/react";
 import { User } from "@supabase/auth-js";
 import { motion, AnimatePresence } from "framer-motion";
@@ -30,6 +30,8 @@ function toInputLocal(dateIso: string | null | undefined) {
 
 const NewProblemPage = () => {
   const supabase = createClient();
+  const router = useRouter();
+
   const [user, setUser] = useState<User | null>(null);
   const searchParams = useSearchParams();
   const [isEditing, setIsEditing] = useState(false);
@@ -561,10 +563,11 @@ int main(void) {
               conditions,
               sample_inputs: examplePairs.map((pair) => pair.input),
               sample_outputs: examplePairs.map((pair) => pair.output),
-              time_limit: timeLimit,
-              memory_limit: memoryLimit,
               published_at: new Date(publishedAt).toISOString(),
               default_code: code,
+              time_limit: timeLimit,
+              memory_limit: memoryLimit,
+              organization_id: searchParams.get("id"),
               deadline: hasDeadline ? new Date(deadline).toISOString() : null,
             };
 
@@ -615,6 +618,8 @@ int main(void) {
                   theme: theme === "dark" ? "dark" : "light",
                   transition: Bounce,
                 });
+                router.push(`/organization/${searchParams.get("id")}/problems`);
+                router.refresh();
               }
             }
           }}

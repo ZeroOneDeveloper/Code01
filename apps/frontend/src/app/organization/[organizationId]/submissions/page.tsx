@@ -20,9 +20,9 @@ type StatusFilter =
 type UserNick = { id: string; nickname: string | null };
 
 const SubmissionsPage: React.FC = () => {
-  const params = useParams<{ id: string }>();
+  const params = useParams<{ organizationId: string }>();
   const searchParams = useSearchParams();
-  const orgId = params?.id ? Number(params.id) : NaN;
+  const orgId = params?.organizationId ? Number(params.organizationId) : NaN;
 
   const supabase = createClient();
 

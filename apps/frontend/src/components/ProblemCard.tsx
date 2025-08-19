@@ -16,10 +16,13 @@ function formatKoreanDate(d: Date) {
 const Detail: React.FC<{
   icon: React.ElementType;
   children: React.ReactNode;
-}> = ({ icon: Icon, children }) => (
+  className?: string;
+}> = ({ icon: Icon, children, className = "" }) => (
   <div className="flex items-center gap-2 min-w-0">
-    <Icon className="w-5 h-5 shrink-0" />
-    <span className="text-sm font-semibold truncate">{children}</span>
+    <Icon className={`w-5 h-5 shrink-0 ${className}`} />
+    <span className={`text-sm font-semibold truncate ${className}`}>
+      {children}
+    </span>
   </div>
 );
 
@@ -30,12 +33,16 @@ const CardInner: React.FC<{ problem: Problem }> = ({ problem }) => {
     : new Date(problem.published_at);
   const datePrefix = hasDeadline ? "마감" : "게시일";
 
+  const dateColor = hasDeadline
+    ? "text-rose-500 dark:text-rose-400"
+    : "text-sky-500 dark:text-sky-400";
+
   return (
     <>
       <h1 className="text-left text-xl font-bold truncate">{problem.title}</h1>
       <div className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-2">
         <Detail icon={LinkIcon}>{problem.id}</Detail>
-        <Detail icon={Calendar}>
+        <Detail icon={Calendar} className={dateColor}>
           {datePrefix} · {formatKoreanDate(date)}
         </Detail>
         <Detail icon={Timer}>

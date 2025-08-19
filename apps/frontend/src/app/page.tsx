@@ -66,17 +66,18 @@ export default async function Home() {
     }
 
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center py-44">
+      <div className="min-h-screen flex flex-col items-center justify-center py-44 gap-8">
         {Object.entries(visibleProblems).map(([orgId, group]) => (
           <div key={orgId} className="container mx-auto px-4">
             <h2 className="text-2xl font-bold mb-4">{group.name}</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 justify-items-center sm:justify-items-start">
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(24rem,24rem))] justify-start gap-6">
               {group.problems.map((problem) => (
-                <ProblemCard
-                  key={problem.id}
-                  problem={problem}
-                  href={`/problem/${problem.id}`}
-                />
+                <div key={problem.id} className="w-[24rem]">
+                  <ProblemCard
+                    problem={problem}
+                    href={`/problem/${problem.id}`}
+                  />
+                </div>
               ))}
             </div>
           </div>
