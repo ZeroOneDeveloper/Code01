@@ -567,7 +567,7 @@ int main(void) {
               default_code: code,
               time_limit: timeLimit,
               memory_limit: memoryLimit,
-              organization_id: searchParams.get("id"),
+              organization_id: searchParams.get("organizationId"),
               deadline: hasDeadline ? new Date(deadline).toISOString() : null,
             };
 
