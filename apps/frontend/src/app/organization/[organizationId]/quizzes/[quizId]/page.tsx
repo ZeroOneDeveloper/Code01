@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import Link from "next/link";
 import { toast } from "react-toastify";
 import { createClient } from "@lib/supabase/client";
@@ -29,7 +29,6 @@ export default function QuizDetailPage() {
     organizationId: string;
     quizId: string;
   }>();
-  const router = useRouter();
   const supabase = createClient();
 
   const [loading, setLoading] = useState(true);
@@ -110,7 +109,7 @@ export default function QuizDetailPage() {
       }
     };
     run();
-  }, [organizationId, quizId]);
+  }, [organizationId, quizId, supabase]);
 
   const status = useMemo(() => (quiz ? statusOf(quiz) : null), [quiz]);
 

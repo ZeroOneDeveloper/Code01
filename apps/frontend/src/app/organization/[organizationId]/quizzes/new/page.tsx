@@ -70,7 +70,7 @@ export default function NewQuizPage() {
       }
     };
     run();
-  }, [organizationId]);
+  }, [organizationId, supabase]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -101,10 +101,6 @@ export default function NewQuizPage() {
     setSelectedIds((prev) =>
       prev.includes(pid) ? prev.filter((x) => x !== pid) : [...prev, pid],
     );
-  };
-
-  const clearSelection = () => {
-    setSelectedIds([]);
   };
 
   const handleCreate = async () => {

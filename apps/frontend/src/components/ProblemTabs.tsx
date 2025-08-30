@@ -49,7 +49,7 @@ const ProblemTabs: React.FC = () => {
       }
     };
     run();
-  }, [problemId]);
+  }, [problemId, supabase]);
 
   return (
     <div className="flex gap-1">

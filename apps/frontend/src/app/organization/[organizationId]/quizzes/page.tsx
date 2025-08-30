@@ -56,7 +56,7 @@ export default function QuizzesIndexPage() {
       }
     };
     run();
-  }, [organizationId]);
+  }, [organizationId, supabase]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -120,9 +120,9 @@ export default function QuizzesIndexPage() {
                   ? "bg-primary text-white border-primary"
                   : "hover:bg-muted/40"
               }`}
-              title={statusLabel(key as any)}
+              title={statusLabel(key)}
             >
-              {statusLabel(key as any)}
+              {statusLabel(key)}
             </button>
           ))}
         </div>
