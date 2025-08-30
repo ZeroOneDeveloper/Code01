@@ -8,6 +8,8 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
     command: uvicorn main:app --host 0.0.0.0 --port 3001
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
     restart: unless-stopped
   frontend:
     build: ./apps/frontend
