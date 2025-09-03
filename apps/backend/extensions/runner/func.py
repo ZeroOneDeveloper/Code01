@@ -8,6 +8,7 @@ from supabase import AsyncClient
 import tempfile
 import shutil
 import math
+import shlex
 
 
 def parse_time_E(time_str):
@@ -59,6 +60,26 @@ async def run_code_in_background(
     # Step 1. C 코드 저장
     with open(code_path, "w") as f:
         f.write(code)
+
+    # Host-side mirror: ensure the host path is created and mirror main.c into it
+    if host_tmp_root:
+        writer_image = os.environ.get("CODE01_WRITER_IMAGE", "busybox:latest")
+        # 1) Ensure the subdir exists on the host
+        ensure_cmd = [
+            "docker", "run", "--rm",
+            "-v", f"{host_tmp_root}:/h:rw",
+            writer_image, "sh", "-lc",
+            f"mkdir -p /h/{os.path.basename(temp_dir)}"
+        ]
+        subprocess.run(ensure_cmd, capture_output=True, text=True)
+        # 2) Write the code into the host-mounted subdir
+        write_cmd = [
+            "docker", "run", "--rm", "-i",
+            "-v", f"{host_temp_dir}:/work:rw",
+            writer_image, "sh", "-lc",
+            "cat > /work/main.c"
+        ]
+        subprocess.run(write_cmd, input=code, capture_output=True, text=True)
 
     # Step 2. Runner 컨테이너에서 컴파일 (DooD)
     runner_image = os.environ.get("CODE01_RUNNER_IMAGE", "gcc:13-bookworm")
