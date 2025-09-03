@@ -570,6 +570,7 @@ int main(void) {
               organization_id: searchParams.get("organizationId"),
               deadline: hasDeadline ? new Date(deadline).toISOString() : null,
             };
+            console.log(searchParams.get("organizationId"));
 
             if (isEditing && editProblemId) {
               const { error } = await supabase
