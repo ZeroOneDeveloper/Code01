@@ -56,12 +56,15 @@ async def run_code_in_background(
     with open(code_path, "w") as f:
         f.write(code)
 
-    # Step 2. 컨테이너 내부에서 직접 컴파일
+    # Step 2. Runner 컨테이너에서 컴파일 (DooD)
+    runner_image = os.environ.get("CODE01_RUNNER_IMAGE", "gcc:13-bookworm")
     compile_cmd = [
-        "gcc",
-        code_path,
-        "-o",
-        binary_path,
+        "docker", "run", "--rm",
+        "-v", f"{temp_dir}:/work:rw",
+        "-w", "/work",
+        runner_image,
+        "bash", "-lc",
+        "gcc -O2 -std=c17 main.c -o main.out"
     ]
     compile_result = subprocess.run(compile_cmd, capture_output=True, text=True)
 
@@ -83,17 +86,26 @@ async def run_code_in_background(
         input_data = test_case["input"]
         expected_output = test_case["output"]
 
-        # Step 3. 컨테이너 내부에서 직접 실행
-        # GNU time으로 메모리 측정, timeout으로 시간 제한 (초 단위 정수)
+        # Step 3. Runner 컨테이너에서 실행 (stdin으로 입력 전달)
         timeout_secs = max(1, int(math.ceil(timeLimitMs / 1000)))
-        if os.path.exists("/usr/bin/time"):
-            cmd = ["/usr/bin/time", "-f", "MEM:%M", "timeout", str(timeout_secs), binary_path]
-        else:
-            # /usr/bin/time이 없을 때는 메모리 측정 없이 실행
-            cmd = ["timeout", str(timeout_secs), binary_path]
-
+        cpus = os.environ.get("CODE01_RUNNER_CPUS", "1.0")
+        mem = os.environ.get("CODE01_RUNNER_MEM", "256m")
+        exec_cmd = [
+            "docker", "run", "--rm", "-i",
+            "--network", "none",
+            "--cpus", str(cpus),
+            "--memory", str(mem),
+            "--pids-limit", "128",
+            "--read-only",
+            "--tmpfs", "/tmp:rw,exec,size=64m",
+            "-v", f"{temp_dir}:/work:rw",
+            "-w", "/work",
+            runner_image,
+            "bash", "-lc",
+            f"if [ -x /usr/bin/time ]; then /usr/bin/time -f 'MEM:%M' timeout {timeout_secs} ./main.out; else timeout {timeout_secs} ./main.out; fi"
+        ]
         start = time.time()
-        result = subprocess.run(cmd, input=str(input_data), capture_output=True, text=True)
+        result = subprocess.run(exec_cmd, input=str(input_data), capture_output=True, text=True)
         end = time.time()
 
         time_ms = int((end - start) * 1000)
