@@ -81,8 +81,43 @@ async def run_code_in_background(
         ]
         subprocess.run(write_cmd, input=code, capture_output=True, text=True)
 
+        # Preflight: verify that main.c is visible to the Docker daemon via the host path
+        verify_cmd = [
+            "docker", "run", "--rm",
+            "-v", f"{host_temp_dir}:/work:rw",
+            writer_image, "sh", "-lc",
+            "ls -al /work; test -f /work/main.c"
+        ]
+        verify_res = subprocess.run(verify_cmd, capture_output=True, text=True)
+        if verify_res.returncode != 0:
+            err_msg = (
+                "Runner cannot see main.c at the host bind path.\n"
+                f"host_temp_dir={host_temp_dir}\n"
+                f"ls_output:\n{verify_res.stdout}\n{verify_res.stderr}\n"
+                "Hint: Make sure you started the backend with:\n"
+                "  -v $(pwd)/runner_tmp:/app/tmp\n"
+                "  -e CODE01_TMPDIR=/app/tmp\n"
+                "  -e CODE01_HOST_TMPDIR=$(pwd)/runner_tmp\n"
+            )
+            await supabase.table("problem_submissions").update(
+                {
+                    "status_code": 6,  # CompilationError (preflight)
+                    "stdout_list": [],
+                    "stderr_list": [err_msg.strip()],
+                    "passed_all": False,
+                    "is_correct": False,
+                    "passed_time_limit": False,
+                    "passed_memory_limit": False,
+                }
+            ).eq("id", pendingId).execute()
+            return [{"error": "Preflight failed: main.c not visible to runner", "log": err_msg}]
+
     # Step 2. Runner 컨테이너에서 컴파일 (DooD)
     runner_image = os.environ.get("CODE01_RUNNER_IMAGE", "gcc:13-bookworm")
+
+    if not host_tmp_root:
+        logging.error("CODE01_HOST_TMPDIR is not set. With Docker-out-of-Docker, the runner needs a HOST path. Set CODE01_HOST_TMPDIR and mount it to CODE01_TMPDIR.")
+
     compile_cmd = [
         "docker", "run", "--rm",
         "-v", f"{host_temp_dir}:/work:rw",
