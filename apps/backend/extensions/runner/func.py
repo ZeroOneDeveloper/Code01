@@ -48,6 +48,10 @@ async def run_code_in_background(
 
     tmp_root = os.environ.get("CODE01_TMPDIR") or os.environ.get("TMPDIR") or "/tmp"
     temp_dir = tempfile.mkdtemp(prefix="code01_", dir=tmp_root)
+    # When using Docker-out-of-Docker, the Docker engine on the HOST needs a HOST path, not the container path.
+    # Provide CODE01_HOST_TMPDIR=<host-absolute-path mapped to CODE01_TMPDIR> at runtime.
+    host_tmp_root = os.environ.get("CODE01_HOST_TMPDIR")
+    host_temp_dir = os.path.join(host_tmp_root, os.path.basename(temp_dir)) if host_tmp_root else temp_dir
     code_path = os.path.join(temp_dir, "main.c")
     binary_path = os.path.join(temp_dir, "main.out")
     result_list = []
@@ -60,7 +64,7 @@ async def run_code_in_background(
     runner_image = os.environ.get("CODE01_RUNNER_IMAGE", "gcc:13-bookworm")
     compile_cmd = [
         "docker", "run", "--rm",
-        "-v", f"{temp_dir}:/work:rw",
+        "-v", f"{host_temp_dir}:/work:rw",
         "-w", "/work",
         runner_image,
         "bash", "-lc",
@@ -98,7 +102,7 @@ async def run_code_in_background(
             "--pids-limit", "128",
             "--read-only",
             "--tmpfs", "/tmp:rw,exec,size=64m",
-            "-v", f"{temp_dir}:/work:rw",
+            "-v", f"{host_temp_dir}:/work:rw",
             "-w", "/work",
             runner_image,
             "bash", "-lc",
