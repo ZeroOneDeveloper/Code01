@@ -6,6 +6,7 @@ import logging
 import subprocess
 from supabase import AsyncClient
 
+
 def parse_time_E(time_str):
     match = re.match(r"(\d+):(\d+):([0-9.]+)", time_str)
     if not match:
@@ -51,19 +52,12 @@ async def run_code_in_background(
     with open(code_path, "w") as f:
         f.write(code)
 
-    # Step 2. Docker 컨테이너에서 컴파일
+    # Step 2. 컨테이너 내부에서 직접 컴파일
     compile_cmd = [
-        "docker",
-        "run",
-        "--rm",
-        "-v",
-        f"{code_path}:/app/code.c",
-        "-v",
-        f"/tmp:/output",
-        "devzerone/gcc-time:latest",
-        "bash",
-        "-c",
-        f"gcc /app/code.c -o /output/{temp_id}.out",
+        "gcc",
+        code_path,
+        "-o",
+        binary_path,
     ]
     compile_result = subprocess.run(compile_cmd, capture_output=True, text=True)
 
@@ -78,33 +72,19 @@ async def run_code_in_background(
                 "passed_time_limit": False,
                 "passed_memory_limit": False,
             }
-        ).eq("problem_id", problem_id).execute()
+        ).eq("id", pendingId).execute()
         return [{"error": "Compilation failed", "log": compile_result.stderr}]
 
     for index, test_case in enumerate(test_cases):
         input_data = test_case["input"]
         expected_output = test_case["output"]
 
-        run_cmd = [
-            "docker",
-            "run",
-            "--rm",
-            "--network",
-            "none",
-            "--memory",
-            f"{memoryLimitMb}m",
-            "--cpus",
-            "0.5",
-            "-v",
-            f"/tmp/{temp_id}.out:/app/run.out",
-            "devzerone/gcc-time:latest",
-            "bash",
-            "-c",
-            f'/usr/bin/time -f "MEM:%M" timeout {timeLimitMs // 1000} bash -c "echo \'{input_data}\' | /app/run.out"',
-        ]
+        # Step 3. 컨테이너 내부에서 직접 실행
+        # ulimit로 메모리 제한, timeout으로 시간 제한
+        run_cmd = f'''/usr/bin/time -f "MEM:%M" timeout {timeLimitMs / 1000} bash -c "echo \'{input_data}\' | {binary_path}"'''
 
         start = time.time()
-        result = subprocess.run(run_cmd, capture_output=True, text=True)
+        result = subprocess.run(run_cmd, capture_output=True, text=True, shell=True)
         end = time.time()
 
         time_ms = int((end - start) * 1000)
@@ -112,6 +92,12 @@ async def run_code_in_background(
         mem_match = re.search(r"MEM:(\d+)", result.stderr)
         if mem_match:
             mem_kb = int(mem_match.group(1))
+
+        memory_exceeded = False
+        if result.returncode != 0 and mem_kb:
+             # Check if memory limit was exceeded (often results in non-zero exit code)
+             if mem_kb > memoryLimitMb * 1024:
+                 memory_exceeded = True
 
         result_list.append(
             {
@@ -123,7 +109,7 @@ async def run_code_in_background(
                 "expected": expected_output.strip(),
                 "received": result.stdout.strip(),
                 "timeout": result.returncode == 124,
-                "memoryExceeded": mem_kb and mem_kb > memoryLimitMb * 1024,
+                "memoryExceeded": memory_exceeded,
             }
         )
 
@@ -164,10 +150,10 @@ async def run_code_in_background(
             "stdout_list": [result["stdout"] for result in result_list],
             "stderr_list": [result["stderr"] for result in result_list],
             "time_ms": max(
-                [result["timeMs"] for result in result_list if result["timeMs"] is not None]
+                [result["timeMs"] for result in result_list if result["timeMs"] is not None] or [0]
             ),
             "memory_kb": max(
-                [result["memoryKb"] for result in result_list if result["memoryKb"] is not None]
+                [result["memoryKb"] for result in result_list if result["memoryKb"] is not None] or [0]
             ),
             "passed_all": all([is_correct, passed_time_limit, passed_memory_limit]),
             "is_correct": is_correct,
