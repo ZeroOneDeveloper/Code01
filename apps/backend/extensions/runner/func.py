@@ -5,6 +5,9 @@ import time
 import logging
 import subprocess
 from supabase import AsyncClient
+import tempfile
+import shutil
+import math
 
 
 def parse_time_E(time_str):
@@ -43,9 +46,10 @@ async def run_code_in_background(
         logging.warning(f"No test cases found for problem {problem_id}.")
         return None
 
-    temp_id = str(uuid.uuid4())
-    code_path = f"/tmp/{temp_id}.c"
-    binary_path = f"/tmp/{temp_id}.out"
+    tmp_root = os.environ.get("CODE01_TMPDIR") or os.environ.get("TMPDIR") or "/tmp"
+    temp_dir = tempfile.mkdtemp(prefix="code01_", dir=tmp_root)
+    code_path = os.path.join(temp_dir, "main.c")
+    binary_path = os.path.join(temp_dir, "main.out")
     result_list = []
 
     # Step 1. C 코드 저장
@@ -80,18 +84,24 @@ async def run_code_in_background(
         expected_output = test_case["output"]
 
         # Step 3. 컨테이너 내부에서 직접 실행
-        # ulimit로 메모리 제한, timeout으로 시간 제한
-        run_cmd = f'''/usr/bin/time -f "MEM:%M" timeout {timeLimitMs / 1000} bash -c "echo \'{input_data}\' | {binary_path}"'''
+        # GNU time으로 메모리 측정, timeout으로 시간 제한 (초 단위 정수)
+        timeout_secs = max(1, int(math.ceil(timeLimitMs / 1000)))
+        if os.path.exists("/usr/bin/time"):
+            cmd = ["/usr/bin/time", "-f", "MEM:%M", "timeout", str(timeout_secs), binary_path]
+        else:
+            # /usr/bin/time이 없을 때는 메모리 측정 없이 실행
+            cmd = ["timeout", str(timeout_secs), binary_path]
 
         start = time.time()
-        result = subprocess.run(run_cmd, capture_output=True, text=True, shell=True)
+        result = subprocess.run(cmd, input=str(input_data), capture_output=True, text=True)
         end = time.time()
 
         time_ms = int((end - start) * 1000)
         mem_kb = None
-        mem_match = re.search(r"MEM:(\d+)", result.stderr)
-        if mem_match:
-            mem_kb = int(mem_match.group(1))
+        if result.stderr:
+            mem_match = re.search(r"MEM:(\d+)", result.stderr)
+            if mem_match:
+                mem_kb = int(mem_match.group(1))
 
         memory_exceeded = False
         if result.returncode != 0 and mem_kb:
@@ -121,9 +131,13 @@ async def run_code_in_background(
         ).eq("id", pendingId).execute()
 
     # Step 4. 정리
-    os.remove(code_path)
-    if os.path.exists(binary_path):
-        os.remove(binary_path)
+    try:
+        if os.path.exists(code_path):
+            os.remove(code_path)
+        if os.path.exists(binary_path):
+            os.remove(binary_path)
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)
 
     is_correct = all(result["isCorrect"] for result in result_list)
     passed_time_limit = all(not result["timeout"] for result in result_list)
