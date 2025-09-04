@@ -16,6 +16,7 @@ const ProblemsPage: React.FC<{
   const { data: problems, error } = await supabase
     .from("problems")
     .select("*")
+    .eq("organization_id", organizationId)
     .order("created_at", { ascending: false });
 
   if (error) {

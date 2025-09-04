@@ -2,7 +2,7 @@ from fastapi import APIRouter, BackgroundTasks
 
 import os
 from pydantic import BaseModel
-from supabase import create_async_client, AsyncClient
+from supabase import acreate_client, AsyncClient
 
 from extensions.runner.func import run_code_in_background
 
@@ -30,7 +30,7 @@ async def root():
 async def run_code(
     problem_submission: ProblemSubmission, background_tasks: BackgroundTasks
 ):
-    supabase: AsyncClient = await create_async_client(
+    supabase: AsyncClient = await acreate_client(
         os.getenv("SUPABASE_URL"),
         os.getenv("SUPABASE_PUBLISHABLE_KEY"),
     )

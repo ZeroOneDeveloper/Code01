@@ -5,11 +5,6 @@ import time
 import logging
 import subprocess
 from supabase import AsyncClient
-import tempfile
-import shutil
-import math
-import shlex
-
 
 def parse_time_E(time_str):
     match = re.match(r"(\d+):(\d+):([0-9.]+)", time_str)
@@ -47,84 +42,29 @@ async def run_code_in_background(
         logging.warning(f"No test cases found for problem {problem_id}.")
         return None
 
-    tmp_root = os.environ.get("CODE01_TMPDIR") or os.environ.get("TMPDIR") or "/tmp"
-    temp_dir = tempfile.mkdtemp(prefix="code01_", dir=tmp_root)
-    # When using Docker-out-of-Docker, the Docker engine on the HOST needs a HOST path, not the container path.
-    # Provide CODE01_HOST_TMPDIR=<host-absolute-path mapped to CODE01_TMPDIR> at runtime.
-    host_tmp_root = os.environ.get("CODE01_HOST_TMPDIR")
-    host_temp_dir = os.path.join(host_tmp_root, os.path.basename(temp_dir)) if host_tmp_root else temp_dir
-    code_path = os.path.join(temp_dir, "main.c")
-    binary_path = os.path.join(temp_dir, "main.out")
+    temp_id = str(uuid.uuid4())
+    code_path = f"/tmp/{temp_id}.c"
+    binary_path = f"/tmp/{temp_id}.out"
     result_list = []
 
     # Step 1. C 코드 저장
     with open(code_path, "w") as f:
         f.write(code)
 
-    # Host-side mirror: ensure the host path is created and mirror main.c into it
-    if host_tmp_root:
-        writer_image = os.environ.get("CODE01_WRITER_IMAGE", "busybox:latest")
-        # 1) Ensure the subdir exists on the host
-        ensure_cmd = [
-            "docker", "run", "--rm",
-            "-v", f"{host_tmp_root}:/h:rw",
-            writer_image, "sh", "-lc",
-            f"mkdir -p /h/{os.path.basename(temp_dir)}"
-        ]
-        subprocess.run(ensure_cmd, capture_output=True, text=True)
-        # 2) Write the code into the host-mounted subdir
-        write_cmd = [
-            "docker", "run", "--rm", "-i",
-            "-v", f"{host_temp_dir}:/work:rw",
-            writer_image, "sh", "-lc",
-            "cat > /work/main.c"
-        ]
-        subprocess.run(write_cmd, input=code, capture_output=True, text=True)
-
-        # Preflight: verify that main.c is visible to the Docker daemon via the host path
-        verify_cmd = [
-            "docker", "run", "--rm",
-            "-v", f"{host_temp_dir}:/work:rw",
-            writer_image, "sh", "-lc",
-            "ls -al /work; test -f /work/main.c"
-        ]
-        verify_res = subprocess.run(verify_cmd, capture_output=True, text=True)
-        if verify_res.returncode != 0:
-            err_msg = (
-                "Runner cannot see main.c at the host bind path.\n"
-                f"host_temp_dir={host_temp_dir}\n"
-                f"ls_output:\n{verify_res.stdout}\n{verify_res.stderr}\n"
-                "Hint: Make sure you started the backend with:\n"
-                "  -v $(pwd)/runner_tmp:/app/tmp\n"
-                "  -e CODE01_TMPDIR=/app/tmp\n"
-                "  -e CODE01_HOST_TMPDIR=$(pwd)/runner_tmp\n"
-            )
-            await supabase.table("problem_submissions").update(
-                {
-                    "status_code": 6,  # CompilationError (preflight)
-                    "stdout_list": [],
-                    "stderr_list": [err_msg.strip()],
-                    "passed_all": False,
-                    "is_correct": False,
-                    "passed_time_limit": False,
-                    "passed_memory_limit": False,
-                }
-            ).eq("id", pendingId).execute()
-            return [{"error": "Preflight failed: main.c not visible to runner", "log": err_msg}]
-
-    # Step 2. Runner 컨테이너에서 컴파일 (DooD)
-    runner_image = os.environ.get("CODE01_RUNNER_IMAGE", "gcc:13-bookworm")
-
-    if not host_tmp_root:
-        logging.error("CODE01_HOST_TMPDIR is not set. With Docker-out-of-Docker, the runner needs a HOST path. Set CODE01_HOST_TMPDIR and mount it to CODE01_TMPDIR.")
-
+    # Step 2. Docker 컨테이너에서 컴파일
     compile_cmd = [
-        "docker", "run", "--rm",
-        "-v", f"{host_temp_dir}:/work:rw",
-        "-w", "/work",
-        runner_image,
-        "bash", "-lc",
-        "gcc -O2 -std=c17 main.c -o main.out"
+        "sudo",
+        "docker",
+        "run",
+        "--rm",
+        "-v",
+        f"{code_path}:/app/code.c",
+        "-v",
+        f"/tmp:/output",
+        "devzerone/gcc-time:latest",
+        "bash",
+        "-c",
+        f"gcc /app/code.c -o /output/{temp_id}.out",
     ]
     compile_result = subprocess.run(compile_cmd, capture_output=True, text=True)
 
@@ -139,47 +79,41 @@ async def run_code_in_background(
                 "passed_time_limit": False,
                 "passed_memory_limit": False,
             }
-        ).eq("id", pendingId).execute()
+        ).eq("problem_id", problem_id).execute()
         return [{"error": "Compilation failed", "log": compile_result.stderr}]
 
     for index, test_case in enumerate(test_cases):
         input_data = test_case["input"]
         expected_output = test_case["output"]
 
-        # Step 3. Runner 컨테이너에서 실행 (stdin으로 입력 전달)
-        timeout_secs = max(1, int(math.ceil(timeLimitMs / 1000)))
-        cpus = os.environ.get("CODE01_RUNNER_CPUS", "1.0")
-        mem = os.environ.get("CODE01_RUNNER_MEM", "256m")
-        exec_cmd = [
-            "docker", "run", "--rm", "-i",
-            "--network", "none",
-            "--cpus", str(cpus),
-            "--memory", str(mem),
-            "--pids-limit", "128",
-            "--read-only",
-            "--tmpfs", "/tmp:rw,exec,size=64m",
-            "-v", f"{host_temp_dir}:/work:rw",
-            "-w", "/work",
-            runner_image,
-            "bash", "-lc",
-            f"if [ -x /usr/bin/time ]; then /usr/bin/time -f 'MEM:%M' timeout {timeout_secs} ./main.out; else timeout {timeout_secs} ./main.out; fi"
+        run_cmd = [
+            "sudo",
+            "docker",
+            "run",
+            "--rm",
+            "--network",
+            "none",
+            "--memory",
+            f"{memoryLimitMb}m",
+            "--cpus",
+            "0.5",
+            "-v",
+            f"/tmp/{temp_id}.out:/app/run.out",
+            "devzerone/gcc-time:latest",
+            "bash",
+            "-c",
+            f'/usr/bin/time -f "MEM:%M" timeout {timeLimitMs // 1000} bash -c "echo \'{input_data}\' | /app/run.out"',
         ]
+
         start = time.time()
-        result = subprocess.run(exec_cmd, input=str(input_data), capture_output=True, text=True)
+        result = subprocess.run(run_cmd, capture_output=True, text=True)
         end = time.time()
 
         time_ms = int((end - start) * 1000)
         mem_kb = None
-        if result.stderr:
-            mem_match = re.search(r"MEM:(\d+)", result.stderr)
-            if mem_match:
-                mem_kb = int(mem_match.group(1))
-
-        memory_exceeded = False
-        if result.returncode != 0 and mem_kb:
-             # Check if memory limit was exceeded (often results in non-zero exit code)
-             if mem_kb > memoryLimitMb * 1024:
-                 memory_exceeded = True
+        mem_match = re.search(r"MEM:(\d+)", result.stderr)
+        if mem_match:
+            mem_kb = int(mem_match.group(1))
 
         result_list.append(
             {
@@ -191,7 +125,7 @@ async def run_code_in_background(
                 "expected": expected_output.strip(),
                 "received": result.stdout.strip(),
                 "timeout": result.returncode == 124,
-                "memoryExceeded": memory_exceeded,
+                "memoryExceeded": mem_kb and mem_kb > memoryLimitMb * 1024,
             }
         )
 
@@ -203,13 +137,9 @@ async def run_code_in_background(
         ).eq("id", pendingId).execute()
 
     # Step 4. 정리
-    try:
-        if os.path.exists(code_path):
-            os.remove(code_path)
-        if os.path.exists(binary_path):
-            os.remove(binary_path)
-    finally:
-        shutil.rmtree(temp_dir, ignore_errors=True)
+    os.remove(code_path)
+    if os.path.exists(binary_path):
+        os.remove(binary_path)
 
     is_correct = all(result["isCorrect"] for result in result_list)
     passed_time_limit = all(not result["timeout"] for result in result_list)
@@ -236,10 +166,10 @@ async def run_code_in_background(
             "stdout_list": [result["stdout"] for result in result_list],
             "stderr_list": [result["stderr"] for result in result_list],
             "time_ms": max(
-                [result["timeMs"] for result in result_list if result["timeMs"] is not None] or [0]
+                [result["timeMs"] for result in result_list if result["timeMs"] is not None]
             ),
             "memory_kb": max(
-                [result["memoryKb"] for result in result_list if result["memoryKb"] is not None] or [0]
+                [result["memoryKb"] for result in result_list if result["memoryKb"] is not None]
             ),
             "passed_all": all([is_correct, passed_time_limit, passed_memory_limit]),
             "is_correct": is_correct,

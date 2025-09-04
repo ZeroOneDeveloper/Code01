@@ -57,9 +57,9 @@ const CardInner: React.FC<{ problem: Problem }> = ({ problem }) => {
 };
 
 const ProblemCard: React.FC<{
-  problem: Problem;
-  href?: string;
-  onClick?: () => void;
+  problem: Problem,
+  href?: string,
+  onClick?: () => void,
 }> = ({ problem, href, onClick }) => {
   const className =
     "group flex flex-col gap-3 border border-gray-300/70 rounded-xl px-5 py-4 shadow-sm transition hover:shadow-md hover:-translate-y-0.5";
