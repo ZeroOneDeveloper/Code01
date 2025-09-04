@@ -33,7 +33,7 @@ const NewProblemPage = () => {
   const router = useRouter();
 
   const [user, setUser] = useState<User | null>(null);
-  const params = useParams<{ organizationId: string; }>();
+  const params = useParams<{ organizationId: string }>();
   const searchParams = useSearchParams();
   const [isEditing, setIsEditing] = useState(false);
   const [editProblemId, setEditProblemId] = useState<number | null>(null);

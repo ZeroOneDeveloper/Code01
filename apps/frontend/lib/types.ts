@@ -55,6 +55,15 @@ export interface Problem {
   deadline?: string | null;
 }
 
+export interface TestCase {
+  id: string;
+  problem_id: number;
+  title: string;
+  input: string;
+  output: string;
+  created_at: string;
+}
+
 export enum SubmissionStatus {
   Pending = 0,
   Accepted = 1,

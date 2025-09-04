@@ -1,7 +1,16 @@
+"use client";
+
 import React from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
-import { Link as LinkIcon, Calendar, Timer, MemoryStick } from "lucide-react";
+import {
+  Link as LinkIcon,
+  Calendar,
+  Timer,
+  MemoryStick,
+  Wrench,
+} from "lucide-react";
 
 import { Problem } from "@lib/types";
 
@@ -60,14 +69,35 @@ const ProblemCard: React.FC<{
   problem: Problem;
   href?: string;
   onClick?: () => void;
-}> = ({ problem, href, onClick }) => {
+  manageTestsHref?: string;
+}> = ({ problem, href, onClick, manageTestsHref }) => {
+  const router = useRouter();
   const className =
     "group flex flex-col gap-3 border border-gray-300/70 rounded-xl px-5 py-4 shadow-sm transition hover:shadow-md hover:-translate-y-0.5";
+
+  const ManageButton = () =>
+    manageTestsHref ? (
+      <div className="mt-1 flex justify-end">
+        <button
+          type="button"
+          aria-label="테스트 케이스 관리"
+          onClick={(e) => {
+            e.stopPropagation(); // 부모 Link/버튼 클릭 전파 방지
+            router.push(manageTestsHref);
+          }}
+          className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-300/80 bg-white hover:bg-gray-50 dark:bg-zinc-900 dark:hover:bg-zinc-800 shadow-sm"
+        >
+          <Wrench className="w-4 h-4" />
+          테스트 케이스 관리
+        </button>
+      </div>
+    ) : null;
 
   if (href) {
     return (
       <Link href={href} className={className}>
         <CardInner problem={problem} />
+        <ManageButton />
       </Link>
     );
   }
@@ -75,12 +105,14 @@ const ProblemCard: React.FC<{
     return (
       <button className={className} onClick={onClick}>
         <CardInner problem={problem} />
+        <ManageButton />
       </button>
     );
   }
   return (
     <div className={className}>
       <CardInner problem={problem} />
+      <ManageButton />
     </div>
   );
 };

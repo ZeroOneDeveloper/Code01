@@ -19,7 +19,9 @@ const OrganizationTabs: React.FC = () => {
         {
           label: "문제",
           href: `/organization/${organizationId}/problems`,
-          isActive: pathname === `/organization/${organizationId}/problems`,
+          isActive: pathname.startsWith(
+            `/organization/${organizationId}/problems`,
+          ),
         },
         {
           label: "퀴즈",

@@ -48,6 +48,7 @@ const ProblemsPage: React.FC<{
             key={problem.id}
             problem={problem}
             href={`/organization/${organizationId}/problems/new?id=${problem.id}`}
+            manageTestsHref={`/organization/${organizationId}/problems/tests?id=${problem.id}`}
           />
         ))}
       </div>
