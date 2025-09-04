@@ -23,10 +23,11 @@ const SubmissionCodePage: React.FC = () => {
   const [userLoaded, setUserLoaded] = useState(false);
   const [submissionLoaded, setSubmissionLoaded] = useState(false);
   const [code, setCode] = useState<string>("");
-  const [editorTheme, setEditorTheme] = useState<string>("vs-dark");
+
   const [problem, setProblem] = useState<Problem | null>(null);
   const [minimapEnabled, setMinimapEnabled] = useState(false);
   const [fontSize, setFontSize] = useState(14);
+  const [editorTheme, setEditorTheme] = useState<string>("light");
   const [editorHeight, setEditorHeight] = useState<`${number}vh`>("30vh");
 
   const totalCases = submission?.cases_total ?? 0;
@@ -45,6 +46,10 @@ const SubmissionCodePage: React.FC = () => {
     () => (submission?.memory_kb ? `${submission.memory_kb} KB` : "제한없음"),
     [submission?.memory_kb],
   );
+
+  useEffect(() => {
+    setEditorTheme(theme === "dark" ? "vs-dark" : "light");
+  }, [theme]);
 
   useEffect(() => {
     const fetchProblem = async () => {
@@ -71,19 +76,6 @@ const SubmissionCodePage: React.FC = () => {
       setCode("");
     }
   }, [submission]);
-
-  useEffect(() => {
-    if (typeof window !== "undefined" && window.matchMedia) {
-      try {
-        const prefersDark = window.matchMedia(
-          "(prefers-color-scheme: dark)",
-        ).matches;
-        setEditorTheme(prefersDark ? "vs-dark" : "vs");
-      } catch {
-        setEditorTheme("vs-dark");
-      }
-    }
-  }, []);
 
   useEffect(() => {
     const fetchUser = async () => {

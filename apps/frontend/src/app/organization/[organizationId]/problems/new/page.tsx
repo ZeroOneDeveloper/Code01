@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 
 import { X, CalendarClock } from "lucide-react";
 import Editor from "@monaco-editor/react";
@@ -33,6 +33,7 @@ const NewProblemPage = () => {
   const router = useRouter();
 
   const [user, setUser] = useState<User | null>(null);
+  const params = useParams<{ organizationId: string; }>();
   const searchParams = useSearchParams();
   const [isEditing, setIsEditing] = useState(false);
   const [editProblemId, setEditProblemId] = useState<number | null>(null);
@@ -567,10 +568,9 @@ int main(void) {
               default_code: code,
               time_limit: timeLimit,
               memory_limit: memoryLimit,
-              organization_id: searchParams.get("organizationId"),
+              organization_id: parseInt(params.organizationId),
               deadline: hasDeadline ? new Date(deadline).toISOString() : null,
             };
-            console.log(searchParams.get("organizationId"));
 
             if (isEditing && editProblemId) {
               const { error } = await supabase
@@ -619,7 +619,7 @@ int main(void) {
                   theme: theme === "dark" ? "dark" : "light",
                   transition: Bounce,
                 });
-                router.push(`/organization/${searchParams.get("id")}/problems`);
+                router.push(`/organization/${params.organizationId}/problems`);
                 router.refresh();
               }
             }
