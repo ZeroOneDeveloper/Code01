@@ -27,8 +27,8 @@ services:
       dockerfile: Dockerfile   # ← frontend/Dockerfile 사용
     image: code01-frontend:latest
     container_name: code01-frontend
-    depends_on:
-      - backend
+#    depends_on:
+#      - backend
     ports:
       - "3000:3000"
     environment:
