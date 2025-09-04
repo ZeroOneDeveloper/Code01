@@ -1,25 +1,25 @@
 version: "3.8"
 
 services:
-  backend:
-    build:
-      context: apps/backend/
-      dockerfile: Dockerfile   # ← backend/Dockerfile 사용
-    image: code01-backend:latest
-    container_name: code01-backend
-    ports:
-      - "3001:3001"
-    environment:
-      - PYTHONUNBUFFERED=1
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    # 헬스체크(백엔드 Dockerfile에 curl 설치되어 있다면 OK)
-    healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:3001 || exit 1"]
-      interval: 10s
-      timeout: 3s
-      retries: 10
-    restart: unless-stopped
+#  backend:
+#    build:
+#      context: apps/backend/
+#      dockerfile: Dockerfile   # ← backend/Dockerfile 사용
+#    image: code01-backend:latest
+#    container_name: code01-backend
+#    ports:
+#      - "3001:3001"
+#    environment:
+#      - PYTHONUNBUFFERED=1
+#    volumes:
+#      - /var/run/docker.sock:/var/run/docker.sock
+#    # 헬스체크(백엔드 Dockerfile에 curl 설치되어 있다면 OK)
+#    healthcheck:
+#      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:3001 || exit 1"]
+#      interval: 10s
+#      timeout: 3s
+#      retries: 10
+#    restart: unless-stopped
 
   frontend:
     build:
