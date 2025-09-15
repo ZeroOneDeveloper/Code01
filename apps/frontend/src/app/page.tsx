@@ -1,6 +1,6 @@
 import React from "react";
 
-import { Problem } from "@lib/types";
+import { Problem, toGradeKo } from "@lib/types";
 import { createClient } from "@lib/supabase/server";
 
 export default async function Home() {
@@ -155,7 +155,7 @@ export default async function Home() {
                           {userMap[problem.created_by] ?? "-"}
                         </td>
                         <td className="px-4 py-2 text-gray-700 dark:text-gray-300">
-                          {problem.grade ?? "-"}
+                          {toGradeKo(problem.grade)}
                         </td>
                         <td className="px-4 py-2 text-right text-gray-900 dark:text-gray-100">
                           {statsMap[problem.id]?.solved ?? 0}

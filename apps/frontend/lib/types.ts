@@ -8,6 +8,8 @@ export interface UserProfile {
   created_at: string;
 }
 
+export type Language = "python" | "java" | "c" | "cpp";
+
 export interface Submission {
   id: string;
   user_id: string;
@@ -55,7 +57,7 @@ export interface Problem {
   organization_id: number;
   deadline?: string | null;
   grade: "expert" | "advanced" | "intermediate" | "beginner";
-  available_languages: string[];
+  available_languages: Language[];
 }
 
 export interface TestCase {
@@ -99,5 +101,20 @@ export const toStatusKo = (code: number | string): string => {
       return "시스템 에러";
     default:
       return "알 수 없음";
+  }
+};
+
+export const toGradeKo = (grade: Problem["grade"] | undefined): string => {
+  switch (grade) {
+    case "expert":
+      return "최상급";
+    case "advanced":
+      return "상급";
+    case "intermediate":
+      return "중급";
+    case "beginner":
+      return "초급";
+    default:
+      return "-";
   }
 };

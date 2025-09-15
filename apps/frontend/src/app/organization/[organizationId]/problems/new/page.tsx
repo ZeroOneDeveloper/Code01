@@ -10,7 +10,10 @@ import { User } from "@supabase/auth-js";
 import { motion, AnimatePresence } from "framer-motion";
 import { Bounce, toast } from "react-toastify";
 
+import type { Language } from "@lib/types";
 import { createClient } from "@lib/supabase/client";
+
+const ALL_LANGUAGES: Language[] = ["python", "java", "c", "cpp"];
 
 function isValidDate(dateStr: string) {
   const date = new Date(dateStr);
@@ -41,6 +44,13 @@ const NewProblemPage = () => {
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  // Add availableLanguages and grade state
+  const [availableLanguages, setAvailableLanguages] = useState<
+    ("python" | "java" | "c" | "cpp")[]
+  >([]);
+  const [grade, setGrade] = useState<
+    "expert" | "advanced" | "intermediate" | "beginner" | ""
+  >("");
   const [code, setCode] = useState(`#include <stdio.h>
 
 int solution(int a, int b, int c) {
@@ -119,7 +129,7 @@ int main(void) {
       const { data, error } = await supabase
         .from("problems")
         .select(
-          "id, title, description, published_at, created_by, input_description, output_description, conditions, sample_inputs, sample_outputs, default_code, time_limit, memory_limit, organization_id, deadline",
+          "id, title, description, published_at, created_by, input_description, output_description, conditions, sample_inputs, sample_outputs, default_code, time_limit, memory_limit, organization_id, deadline, available_languages, grade",
         )
         .eq("id", idNum)
         .single();
@@ -172,6 +182,12 @@ int main(void) {
       const has = !!data.deadline;
       setHasDeadline(has);
       setDeadline(has && data.deadline ? toInputLocal(data.deadline) : "");
+
+      // Set availableLanguages and grade if present
+      setAvailableLanguages(
+        Array.isArray(data.available_languages) ? data.available_languages : [],
+      );
+      setGrade(data.grade ?? "");
 
       toast.success("기존 문제를 불러왔어요.", {
         position: "top-right",
@@ -424,6 +440,53 @@ int main(void) {
         </div>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 px-6 pb-6">
+        <div className="flex flex-col gap-4 px-6">
+          <h1 className="text-2xl font-bold">제출 가능 언어</h1>
+          <div className="flex gap-2 flex-wrap">
+            {ALL_LANGUAGES.map((lang) => (
+              <label key={lang} className="inline-flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={availableLanguages.includes(lang as Language)}
+                  onChange={(e) => {
+                    setAvailableLanguages((prev) =>
+                      e.target.checked
+                        ? [...prev, lang as Language]
+                        : prev.filter((l) => l !== lang),
+                    );
+                  }}
+                />
+                <span className="text-sm text-gray-700 dark:text-gray-300">
+                  {lang}
+                </span>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-4 px-6">
+          <h1 className="text-2xl font-bold">난이도</h1>
+          <select
+            className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-black dark:text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200"
+            value={grade}
+            onChange={(e) =>
+              setGrade(
+                e.target.value as
+                  | "expert"
+                  | "advanced"
+                  | "intermediate"
+                  | "beginner"
+                  | "",
+              )
+            }
+          >
+            <option value="">선택 안 함</option>
+            <option value="expert">최상급</option>
+            <option value="advanced">상급</option>
+            <option value="intermediate">중급</option>
+            <option value="beginner">초급</option>
+          </select>
+        </div>
         <div className="flex flex-col gap-2">
           <label className="text-xl font-bold">시간 제한 (ms)</label>
           <input
@@ -479,7 +542,9 @@ int main(void) {
               !description ||
               !publishedAt ||
               !inputDescription ||
-              !outputDescription
+              !outputDescription ||
+              availableLanguages.length == 0 ||
+              !grade
             ) {
               toast.error("모든 필수 정보를 입력하세요.", {
                 position: "top-right",
@@ -570,6 +635,8 @@ int main(void) {
               memory_limit: memoryLimit,
               organization_id: parseInt(params.organizationId),
               deadline: hasDeadline ? new Date(deadline).toISOString() : null,
+              available_languages: availableLanguages,
+              grade: grade || null,
             };
 
             if (isEditing && editProblemId) {
