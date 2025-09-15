@@ -2,7 +2,6 @@ import React from "react";
 
 import { Problem } from "@lib/types";
 import { createClient } from "@lib/supabase/server";
-import ProblemCard from "@components/ProblemCard";
 
 export default async function Home() {
   const supabase = await createClient();
@@ -69,16 +68,85 @@ export default async function Home() {
       <div className="min-h-screen flex flex-col items-center justify-center py-44 gap-8">
         {Object.entries(visibleProblems).map(([orgId, group]) => (
           <div key={orgId} className="container mx-auto px-4">
-            <h2 className="text-2xl font-bold mb-4">{group.name}</h2>
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(24rem,24rem))] justify-start gap-6">
-              {group.problems.map((problem) => (
-                <div key={problem.id} className="w-[24rem]">
-                  <ProblemCard
-                    problem={problem}
-                    href={`/problem/${problem.id}`}
-                  />
-                </div>
-              ))}
+            <div className="max-w-5xl mx-auto">
+              <h2 className="text-2xl font-bold mb-4">{group.name}</h2>
+            </div>
+            <div className="overflow-x-auto max-w-5xl mx-auto">
+              <div className="max-w-5xl mx-auto">
+                <table className="table-fixed w-full max-w-5xl border border-gray-200 bg-white dark:bg-gray-900 rounded-lg">
+                  <colgroup>
+                    <col className="w-16" />
+                    <col className="w-64" />
+                    <col className="w-64" />
+                    <col className="w-24" />
+                    <col className="w-24" />
+                    <col className="w-24" />
+                    <col className="w-24" />
+                  </colgroup>
+                  <thead>
+                    <tr className="bg-gray-100 dark:bg-gray-800">
+                      <th className="px-4 py-2 text-left font-semibold text-gray-700 dark:text-gray-200 border-b">
+                        문제
+                      </th>
+                      <th className="px-4 py-2 text-left font-semibold text-gray-700 dark:text-gray-200 border-b">
+                        문제 제목
+                      </th>
+                      <th className="px-4 py-2 text-left font-semibold text-gray-700 dark:text-gray-200 border-b">
+                        업로더
+                      </th>
+                      <th className="px-4 py-2 text-left font-semibold text-gray-700 dark:text-gray-200 border-b">
+                        등급
+                      </th>
+                      <th className="px-4 py-2 text-right font-semibold text-gray-700 dark:text-gray-200 border-b">
+                        맞힌 사람
+                      </th>
+                      <th className="px-4 py-2 text-right font-semibold text-gray-700 dark:text-gray-200 border-b">
+                        제출
+                      </th>
+                      <th className="px-4 py-2 text-right font-semibold text-gray-700 dark:text-gray-200 border-b">
+                        정답 비율
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {group.problems.map((problem) => (
+                      <tr
+                        key={problem.id}
+                        className="border-b last:border-b-0 hover:bg-gray-50 dark:hover:bg-gray-800 transition"
+                      >
+                        <td className="px-4 py-2 text-gray-900 dark:text-gray-100">
+                          {problem.id}
+                        </td>
+                        <td className="px-4 py-2">
+                          <a
+                            href={`/problem/${problem.id}`}
+                            className="text-blue-600 hover:underline dark:text-blue-400"
+                          >
+                            {problem.title}
+                          </a>
+                        </td>
+                        <td className="px-4 py-2 text-gray-700 dark:text-gray-300">
+                          {problem.created_by ?? "-"}
+                        </td>
+                        <td className="px-4 py-2 text-gray-700 dark:text-gray-300">
+                          {problem.grade ?? "-"}
+                        </td>
+                        <td className="px-4 py-2 text-right text-gray-900 dark:text-gray-100">
+                          {problem.solved_count ?? 0}
+                        </td>
+                        <td className="px-4 py-2 text-right text-gray-900 dark:text-gray-100">
+                          {problem.submission_count ?? 0}
+                        </td>
+                        <td className="px-4 py-2 text-right text-gray-900 dark:text-gray-100">
+                          {typeof problem.accuracy_rate === "number"
+                            ? `${problem.accuracy_rate.toFixed(1)}%`
+                            : "-"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         ))}

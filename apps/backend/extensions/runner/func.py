@@ -1,183 +1,143 @@
 import os
-import re
-import uuid
-import time
 import logging
-import subprocess
 from supabase import AsyncClient
+import tempfile
+import subprocess
+from pathlib import Path
 
-def parse_time_E(time_str):
-    match = re.match(r"(\d+):(\d+):([0-9.]+)", time_str)
-    if not match:
-        return None
-    h, m, s = match.groups()
-    return int(h) * 3600 + int(m) * 60 + float(s)
-
+# Piston API가 지원하는 언어와 최신 버전을 매핑합니다.
+# 실제 Piston의 /runtimes 엔드포인트를 통해 동적으로 가져올 수도 있습니다.
+LANGUAGE_VERSION_MAP = {
+    "c": "10.2.0",
+    "cpp": "10.2.0",
+    "python": "3.10.0",
+    "javascript": "18.15.0",
+    "java": "15.0.2",
+    "go": "1.16.2",
+    "rust": "1.68.2",
+}
 
 async def run_code_in_background(
     supabase: AsyncClient,
     pendingId: int,
     code: str,
+    language: str,
     problem_id: int,
 ):
-    problem = (
-        await supabase.table("problems").select("time_limit, memory_limit").eq(
-            "id", problem_id
-        ).execute()
-    ).data
-    if not problem:
-        logging.warning(
-            f"Problem with ID {problem_id} not found in the database."
-        )
-        return None
+    try:
+        problem = (
+            await supabase.table("problems").select("time_limit, memory_limit").eq(
+                "id", problem_id
+            ).execute()
+        ).data
+        if not problem:
+            raise ValueError(f"Problem with ID {problem_id} not found.")
 
-    timeLimitMs = problem[0]["time_limit"] * 1000 if problem[0]["time_limit"] is not None else 20000
-    memoryLimitMb = problem[0]["memory_limit"] if problem[0]["memory_limit"] is not None else 128
+        time_limit_sec = problem[0].get("time_limit", 10)
+        memory_limit_mb = problem[0].get("memory_limit", 128)
 
-    test_cases = (await supabase.table("test_cases").select("input, output").eq(
-        "problem_id", problem_id
-    ).execute()).data
+        test_cases = (await supabase.table("test_cases").select("input, output").eq(
+            "problem_id", problem_id
+        ).execute()).data
+        if not test_cases:
+            raise ValueError(f"No test cases found for problem {problem_id}.")
 
-    if not test_cases:
-        logging.warning(f"No test cases found for problem {problem_id}.")
-        return None
+        isolate_path = "/opt/isolate/isolate"
+        box_id = "0"
+        box_dir = f"/var/local/lib/isolate/{box_id}/box"
+        result_list = []
 
-    temp_id = str(uuid.uuid4())
-    code_path = f"/tmp/{temp_id}.c"
-    binary_path = f"/tmp/{temp_id}.out"
-    result_list = []
+        for index, test_case in enumerate(test_cases):
+            subprocess.run([isolate_path, "--cg", "--box-id", box_id, "--init"], check=True)
 
-    # Step 1. C 코드 저장
-    with open(code_path, "w") as f:
-        f.write(code)
+            input_path = Path(box_dir) / "input.txt"
+            input_path.write_text(test_case.get("input", ""))
 
-    # Step 2. Docker 컨테이너에서 컴파일
-    compile_cmd = [
-        "sudo",
-        "docker",
-        "run",
-        "--rm",
-        "-v",
-        f"{code_path}:/app/code.c",
-        "-v",
-        f"/tmp:/output",
-        "devzerone/gcc-time:latest",
-        "bash",
-        "-c",
-        f"gcc /app/code.c -o /output/{temp_id}.out",
-    ]
-    compile_result = subprocess.run(compile_cmd, capture_output=True, text=True)
+            code_file = "Main.java" if language == "java" else "code"
+            code_path = Path(box_dir) / code_file
+            code_path.write_text(code)
 
-    if compile_result.returncode != 0:
-        await supabase.table("problem_submissions").update(
-            {
-                "status_code": 6,  # CompilationError
-                "stdout_list": [],
-                "stderr_list": [compile_result.stderr.strip()],
-                "passed_all": False,
-                "is_correct": False,
-                "passed_time_limit": False,
-                "passed_memory_limit": False,
-            }
-        ).eq("problem_id", problem_id).execute()
-        return [{"error": "Compilation failed", "log": compile_result.stderr}]
+            compile_cmd = None
+            run_cmd = None
 
-    for index, test_case in enumerate(test_cases):
-        input_data = test_case["input"]
-        expected_output = test_case["output"]
+            if language == "c":
+                compile_cmd = f"gcc {code_file} -o exec"
+                run_cmd = "./exec"
+            elif language == "cpp":
+                compile_cmd = f"g++ {code_file} -o exec"
+                run_cmd = "./exec"
+            elif language == "python":
+                run_cmd = f"python3 {code_file}"
+            elif language == "java":
+                compile_cmd = f"javac {code_file}"
+                run_cmd = "java Main"
 
-        run_cmd = [
-            "sudo",
-            "docker",
-            "run",
-            "--rm",
-            "--network",
-            "none",
-            "--memory",
-            f"{memoryLimitMb}m",
-            "--cpus",
-            "0.5",
-            "-v",
-            f"/tmp/{temp_id}.out:/app/run.out",
-            "devzerone/gcc-time:latest",
-            "bash",
-            "-c",
-            f'/usr/bin/time -f "MEM:%M" timeout {timeLimitMs // 1000} bash -c "echo \'{input_data}\' | /app/run.out"',
-        ]
+            if compile_cmd:
+                subprocess.run(
+                    [isolate_path, "--cg", "--box-id", box_id, "--run", "--", "sh", "-c", compile_cmd],
+                    check=True,
+                )
 
-        start = time.time()
-        result = subprocess.run(run_cmd, capture_output=True, text=True)
-        end = time.time()
+            exec_result = subprocess.run([
+                isolate_path, "--cg", "--box-id", box_id,
+                f"--time={time_limit_sec}", f"--mem={memory_limit_mb}",
+                "--stdin=input.txt", "--stdout=stdout.txt", "--stderr=stderr.txt",
+                "--", *run_cmd.split()
+            ])
 
-        time_ms = int((end - start) * 1000)
-        mem_kb = None
-        mem_match = re.search(r"MEM:(\d+)", result.stderr)
-        if mem_match:
-            mem_kb = int(mem_match.group(1))
+            stdout_file = Path(box_dir) / "stdout.txt"
+            stderr_file = Path(box_dir) / "stderr.txt"
+            stdout = stdout_file.read_text().strip() if stdout_file.exists() else ""
+            stderr = stderr_file.read_text().strip() if stderr_file.exists() else ""
+            exit_code = exec_result.returncode
 
-        result_list.append(
-            {
-                "stdout": result.stdout.strip(),
-                "stderr": result.stderr.strip(),
-                "timeMs": time_ms,
-                "memoryKb": mem_kb,
-                "isCorrect": result.stdout.strip() == expected_output.strip(),
-                "expected": expected_output.strip(),
-                "received": result.stdout.strip(),
-                "timeout": result.returncode == 124,
-                "memoryExceeded": mem_kb and mem_kb > memoryLimitMb * 1024,
-            }
-        )
+            is_correct = stdout == test_case.get("output", "").strip()
+            is_timeout = exit_code == 142  # isolate timeout signal
 
-        await supabase.table("problem_submissions").update(
-            {
-                "cases_total": len(test_cases),
-                "cases_done": index + 1,
-            }
-        ).eq("id", pendingId).execute()
+            result_list.append({
+                "stdout": stdout,
+                "stderr": stderr,
+                "is_correct": is_correct,
+                "is_timeout": is_timeout,
+                "exit_code": exit_code,
+            })
 
-    # Step 4. 정리
-    os.remove(code_path)
-    if os.path.exists(binary_path):
-        os.remove(binary_path)
+            await supabase.table("problem_submissions").update(
+                {"cases_done": index + 1, "cases_total": len(test_cases)}
+            ).eq("id", pendingId).execute()
 
-    is_correct = all(result["isCorrect"] for result in result_list)
-    passed_time_limit = all(not result["timeout"] for result in result_list)
-    passed_memory_limit = all(
-        not result["memoryExceeded"] for result in result_list
-    )
+        subprocess.run([isolate_path, "--box-id", box_id, "--cleanup"])
 
-    if is_correct and passed_time_limit and passed_memory_limit:
-        status_code = 1  # Accepted
-    elif not is_correct:
-        status_code = 2  # WrongAnswer
-    elif not passed_time_limit:
-        status_code = 3  # TimeLimitExceeded
-    elif not passed_memory_limit:
-        status_code = 4  # MemoryLimitExceeded
-    elif any("error" in result for result in result_list):
-        status_code = 5  # RuntimeError
-    else:
-        status_code = 7  # InternalError
+        # 최종 결과 판정
+        is_correct_all = all(r["is_correct"] for r in result_list)
+        is_time_limit_exceeded = any(r["is_timeout"] for r in result_list)
+        is_runtime_error = any(r["exit_code"] != 0 for r in result_list)
 
-    await supabase.table("problem_submissions").update(
-        {
+        status_code = 7 # InternalError by default
+        if is_time_limit_exceeded:
+            status_code = 3 # TimeLimitExceeded
+        elif not is_correct_all:
+            status_code = 2 # WrongAnswer
+        elif is_runtime_error:
+            status_code = 5 # RuntimeError
+        elif is_correct_all:
+            status_code = 1 # Accepted
+
+        await supabase.table("problem_submissions").update({
             "status_code": status_code,
-            "stdout_list": [result["stdout"] for result in result_list],
-            "stderr_list": [result["stderr"] for result in result_list],
-            "time_ms": max(
-                [result["timeMs"] for result in result_list if result["timeMs"] is not None]
-            ),
-            "memory_kb": max(
-                [result["memoryKb"] for result in result_list if result["memoryKb"] is not None]
-            ),
-            "passed_all": all([is_correct, passed_time_limit, passed_memory_limit]),
-            "is_correct": is_correct,
-            "passed_time_limit": passed_time_limit,
-            "passed_memory_limit": passed_memory_limit,
-        }
-    ).eq("id", pendingId).execute()
+            "stdout_list": [r["stdout"] for r in result_list],
+            "stderr_list": [r["stderr"] for r in result_list],
+            "passed_all": status_code == 1,
+            "is_correct": is_correct_all,
+            "passed_time_limit": not is_time_limit_exceeded,
+        }).eq("id", pendingId).execute()
 
-    print(f"Processed problem {problem_id} with {len(result_list)} test cases.")
-
-    return None
+    except Exception as e:
+        logging.error(f"Error processing submission {pendingId}: {e}")
+        try:
+            await supabase.table("problem_submissions").update({
+                "status_code": 7, # InternalError
+                "stderr_list": [str(e)]
+            }).eq("id", pendingId).execute()
+        except Exception as db_e:
+            logging.error(f"Failed to update DB for submission {pendingId} on error: {db_e}")

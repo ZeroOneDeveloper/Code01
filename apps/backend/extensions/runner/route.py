@@ -4,13 +4,14 @@ import os
 from pydantic import BaseModel
 from supabase import acreate_client, AsyncClient
 
-from extensions.runner.func import run_code_in_background
+from .func import run_code_in_background
 
 
 class ProblemSubmission(BaseModel):
     userId: str
     problemId: str
     code: str
+    language: str
     visibility: str = "public"
 
 
@@ -41,6 +42,7 @@ async def run_code(
             "problem_id": problem_submission.problemId,
             "status_code": 0,
             "code": problem_submission.code,
+            "language": problem_submission.language,
             "stdout_list": [],
             "stderr_list": [],
             "time_ms": 0,
@@ -59,6 +61,7 @@ async def run_code(
         supabase,
         int(inserted.data[0]['id']),
         problem_submission.code,
+        problem_submission.language,
         int(problem_submission.problemId) if problem_submission.problemId.isdigit() else problem_submission.problemId,
     )
     return {"message": "Code is being processed in the background.", "pendingId": inserted.data[0]['id']}
