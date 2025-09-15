@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 
 import Editor from "@monaco-editor/react";
@@ -57,7 +57,7 @@ export default function ProblemTestsPage() {
     [total, pageSize],
   );
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true);
     // 총 개수
     const { count: totalCount } = await supabase
@@ -87,7 +87,7 @@ export default function ProblemTestsPage() {
       setItems(data ?? []);
     }
     setLoading(false);
-  }
+  }, [problemId, page, pageSize, supabase]);
 
   useEffect(() => {
     load();
@@ -135,7 +135,6 @@ export default function ProblemTestsPage() {
           python_code: pyCode,
           count: c,
           base_seed: Number(baseSeed) || 0,
-
         }),
       });
 
@@ -149,7 +148,8 @@ export default function ProblemTestsPage() {
         autoClose: 1600,
       });
     } catch (e) {
-      toast.error(`생성 작업 등록 실패: ${e.message}`, { transition: Bounce });
+      const message = e instanceof Error ? e.message : String(e);
+      toast.error(`생성 작업 등록 실패: ${message}`, { transition: Bounce });
     } finally {
       setSubmitting(false);
       // 목록 새로고침 (워커가 처리 후 반영되므로 즉시 변화는 없을 수 있음)

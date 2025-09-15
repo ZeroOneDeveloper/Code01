@@ -83,6 +83,7 @@ const ProblemSubmitForm: React.FC<{
               userId,
               problemId,
               code,
+              language: "c",
               visibility,
             })
             .then((res) => {

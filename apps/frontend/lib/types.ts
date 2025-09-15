@@ -26,6 +26,7 @@ export interface Submission {
   visibility: "public" | "private" | "correct";
   cases_total: number;
   cases_done: number;
+  language: string;
 }
 
 export interface Organization {
@@ -53,6 +54,8 @@ export interface Problem {
   memory_limit: number;
   organization_id: number;
   deadline?: string | null;
+  grade: "expert" | "advanced" | "intermediate" | "beginner";
+  available_languages: string[];
 }
 
 export interface TestCase {

@@ -14,6 +14,32 @@ export default async function Home() {
       .select("*")
       .order("created_at", { ascending: false });
 
+    // Batch-fetch submission stats and user names
+    const problemIds = problems?.map((p) => p.id) ?? [];
+
+    const { data: submissions } = await supabase
+      .from("problem_submissions")
+      .select("problem_id, is_correct")
+      .in("problem_id", problemIds);
+
+    const { data: users } = await supabase.from("users").select("id, name");
+
+    const userMap = Object.fromEntries(
+      (users ?? []).map((u) => [u.id, u.name]),
+    );
+    const statsMap: Record<
+      number,
+      { solved: number; submitted: number; accuracy: number }
+    > = {};
+
+    for (const id of problemIds) {
+      const related = submissions?.filter((s) => s.problem_id === id) ?? [];
+      const submitted = related.length;
+      const solved = related.filter((s) => s.is_correct).length;
+      const accuracy = submitted ? (solved / submitted) * 100 : 0;
+      statsMap[id] = { solved, submitted, accuracy };
+    }
+
     // Cache for organizations to avoid duplicate queries
     const organizations: Record<
       string,
@@ -126,20 +152,20 @@ export default async function Home() {
                           </a>
                         </td>
                         <td className="px-4 py-2 text-gray-700 dark:text-gray-300">
-                          {problem.created_by ?? "-"}
+                          {userMap[problem.created_by] ?? "-"}
                         </td>
                         <td className="px-4 py-2 text-gray-700 dark:text-gray-300">
                           {problem.grade ?? "-"}
                         </td>
                         <td className="px-4 py-2 text-right text-gray-900 dark:text-gray-100">
-                          {problem.solved_count ?? 0}
+                          {statsMap[problem.id]?.solved ?? 0}
                         </td>
                         <td className="px-4 py-2 text-right text-gray-900 dark:text-gray-100">
-                          {problem.submission_count ?? 0}
+                          {statsMap[problem.id]?.submitted ?? 0}
                         </td>
                         <td className="px-4 py-2 text-right text-gray-900 dark:text-gray-100">
-                          {typeof problem.accuracy_rate === "number"
-                            ? `${problem.accuracy_rate.toFixed(1)}%`
+                          {typeof statsMap[problem.id]?.accuracy === "number"
+                            ? `${statsMap[problem.id].accuracy.toFixed(1)}%`
                             : "-"}
                         </td>
                       </tr>
