@@ -91,7 +91,7 @@ export default function ProblemTestsPage() {
 
   useEffect(() => {
     load();
-  }, [page]);
+  }, [page, load]);
 
   function toggleSelect(id: string) {
     setSelected((prev) => {
@@ -148,7 +148,7 @@ export default function ProblemTestsPage() {
         transition: Bounce,
         autoClose: 1600,
       });
-    } catch (e: any) {
+    } catch (e) {
       toast.error(`생성 작업 등록 실패: ${e.message}`, { transition: Bounce });
     } finally {
       setSubmitting(false);

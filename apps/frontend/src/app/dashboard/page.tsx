@@ -6,9 +6,7 @@ import {
   CheckCheck,
   BarChart3,
   ExternalLink,
-  MoreVertical,
 } from 'lucide-react';
-import { UserProfile } from '@lib/types';
 
 const stats = [
   {
@@ -90,11 +88,11 @@ export default async function DashboardPage() {
     return redirect('/login');
   }
 
-  const { data: profile } = await supabase
-    .from('users')
-    .select('*')
-    .eq('id', user.id)
-    .maybeSingle<UserProfile>();
+  // const { data: profile } = await supabase
+  //   .from('users')
+  //   .select('*')
+  //   .eq('id', user.id)
+  //   .maybeSingle<UserProfile>();
 
   if (!isAdmin) {
     return redirect('/');
