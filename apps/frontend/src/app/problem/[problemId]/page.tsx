@@ -107,7 +107,9 @@ const ProblemPage: React.FC<{
           {
             label: "시간 제한",
             value:
-              data.time_limit != null ? `${data.time_limit}초` : "제한없음",
+              data.time_limit != null
+                ? `${data.time_limit / 1000}초`
+                : "제한없음",
           },
           {
             label: "메모리 제한",
