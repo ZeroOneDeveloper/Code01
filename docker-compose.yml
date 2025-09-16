@@ -16,7 +16,6 @@ services:
       retries: 10
     cap_add:
       - SYS_ADMIN
-      - SYS_PTRACE
     security_opt:
       - seccomp=unconfined
       - apparmor:unconfined
