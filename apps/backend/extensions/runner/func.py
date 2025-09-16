@@ -46,7 +46,9 @@ async def run_code_in_background(
         result_list = []
 
         for index, test_case in enumerate(test_cases):
-            with tempfile.TemporaryDirectory() as work_dir:
+            # Create persistent working directory to avoid chdir errors in nsjail
+            work_dir = tempfile.mkdtemp()
+            try:
                 input_path = Path(work_dir) / "input.txt"
                 input_path.write_text(test_case.get("input", ""))
 
@@ -130,6 +132,12 @@ async def run_code_in_background(
                 await supabase.table("problem_submissions").update(
                     {"cases_done": index + 1, "cases_total": len(test_cases)}
                 ).eq("id", pendingId).execute()
+            finally:
+                try:
+                    import shutil
+                    shutil.rmtree(work_dir)
+                except Exception as cleanup_err:
+                    logging.warning(f"Failed to clean up temp dir {work_dir}: {cleanup_err}")
 
         # 최종 결과 판정
         is_correct_all = all(r["is_correct"] for r in result_list)
