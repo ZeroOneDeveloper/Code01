@@ -33,8 +33,8 @@ async def run_code_in_background(
         if not problem:
             raise ValueError(f"Problem with ID {problem_id} not found.")
 
-        time_limit_sec = problem[0].get("time_limit", 10)
-        memory_limit_mb = problem[0].get("memory_limit", 128)
+        time_limit_sec = problem[0].get("time_limit") or 20
+        memory_limit_mb = problem[0].get("memory_limit") or 128
 
         test_cases = (await supabase.table("test_cases").select("input, output").eq(
             "problem_id", problem_id
