@@ -20,6 +20,7 @@ services:
       - seccomp=unconfined
     tmpfs:
       - /sys/fs/cgroup
+      - /run
     restart: unless-stopped
 
   frontend:
