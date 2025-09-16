@@ -19,6 +19,7 @@ services:
       - SYS_PTRACE
     security_opt:
       - seccomp=unconfined
+      - apparmor:unconfined
     devices:
       - /dev/random:/dev/random
     tmpfs:
