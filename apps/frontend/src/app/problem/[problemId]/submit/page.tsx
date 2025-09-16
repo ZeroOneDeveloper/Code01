@@ -54,6 +54,7 @@ const ProblemSubmitPage: React.FC<{
           userId={userId}
           problemId={problemId}
           defaultCode={data.default_code}
+          availableLanguages={data.available_languages}
         />
       )}
     </div>

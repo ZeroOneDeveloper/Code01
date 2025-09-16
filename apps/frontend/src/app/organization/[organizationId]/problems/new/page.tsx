@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { JSX, useEffect, useState } from "react";
 import { useTheme } from "next-themes";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 
@@ -9,11 +9,32 @@ import Editor from "@monaco-editor/react";
 import { User } from "@supabase/auth-js";
 import { motion, AnimatePresence } from "framer-motion";
 import { Bounce, toast } from "react-toastify";
+import { FaJava } from "react-icons/fa";
+import { SiC, SiCplusplus, SiPython } from "react-icons/si";
+import { PiStarFourFill } from "react-icons/pi"; // expert
+import { BsGraphUpArrow, BsGraphDownArrow, BsEmojiSmile } from "react-icons/bs"; // intermediate
 
 import type { Language } from "@lib/types";
 import { createClient } from "@lib/supabase/client";
 
-const ALL_LANGUAGES: Language[] = ["python", "java", "c", "cpp"];
+const ALL_LANGUAGES: { value: Language; label: string; icon: JSX.Element }[] = [
+  {
+    value: "python",
+    label: "Python",
+    icon: <SiPython className="text-blue-500" />,
+  },
+  {
+    value: "java",
+    label: "Java",
+    icon: <FaJava className="text-orange-600" />,
+  },
+  { value: "c", label: "C", icon: <SiC className="text-cyan-700" /> },
+  {
+    value: "cpp",
+    label: "C++",
+    icon: <SiCplusplus className="text-blue-700" />,
+  },
+];
 
 function isValidDate(dateStr: string) {
   const date = new Date(dateStr);
@@ -443,49 +464,75 @@ int main(void) {
         <div className="flex flex-col gap-4 px-6">
           <h1 className="text-2xl font-bold">제출 가능 언어</h1>
           <div className="flex gap-2 flex-wrap">
-            {ALL_LANGUAGES.map((lang) => (
-              <label key={lang} className="inline-flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={availableLanguages.includes(lang as Language)}
-                  onChange={(e) => {
+            {ALL_LANGUAGES.map(({ value, label, icon }) => {
+              const isSelected = availableLanguages.includes(value);
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => {
                     setAvailableLanguages((prev) =>
-                      e.target.checked
-                        ? [...prev, lang as Language]
-                        : prev.filter((l) => l !== lang),
+                      isSelected
+                        ? prev.filter((l) => l !== value)
+                        : [...prev, value],
                     );
                   }}
-                />
-                <span className="text-sm text-gray-700 dark:text-gray-300">
-                  {lang}
-                </span>
-              </label>
-            ))}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-md border transition-all duration-200 transform ${
+                    isSelected
+                      ? "bg-blue-600 text-white scale-105"
+                      : "bg-gray-200 dark:bg-gray-700 text-black dark:text-white"
+                  } hover:scale-105`}
+                >
+                  {icon}
+                  <span className="capitalize">{label}</span>
+                </button>
+              );
+            })}
           </div>
         </div>
 
         <div className="flex flex-col gap-4 px-6">
           <h1 className="text-2xl font-bold">난이도</h1>
-          <select
-            className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-black dark:text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200"
-            value={grade}
-            onChange={(e) =>
-              setGrade(
-                e.target.value as
-                  | "expert"
-                  | "advanced"
-                  | "intermediate"
-                  | "beginner"
-                  | "",
-              )
-            }
-          >
-            <option value="">선택 안 함</option>
-            <option value="expert">최상급</option>
-            <option value="advanced">상급</option>
-            <option value="intermediate">중급</option>
-            <option value="beginner">초급</option>
-          </select>
+          <div className="flex gap-2 flex-wrap">
+            {(["expert", "advanced", "intermediate", "beginner"] as const).map(
+              (level) => {
+                const isActive = grade === level;
+                const baseStyle =
+                  "flex items-center gap-1 px-3 py-1 rounded-md border text-sm cursor-pointer transition-all transform duration-200";
+                const activeStyle = "bg-blue-600 text-white scale-105";
+                const inactiveStyle =
+                  "bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-black dark:text-white hover:scale-105";
+
+                const icon = {
+                  expert: <PiStarFourFill className="text-red-600" />,
+                  advanced: <BsGraphUpArrow className="text-orange-500" />,
+                  intermediate: (
+                    <BsGraphDownArrow className="text-yellow-500" />
+                  ),
+                  beginner: <BsEmojiSmile className="text-green-600" />,
+                }[level];
+
+                const label = {
+                  expert: "최상급",
+                  advanced: "상급",
+                  intermediate: "중급",
+                  beginner: "초급",
+                }[level];
+
+                return (
+                  <button
+                    key={level}
+                    type="button"
+                    onClick={() => setGrade(level)}
+                    className={`${baseStyle} ${isActive ? activeStyle : inactiveStyle}`}
+                  >
+                    {icon}
+                    {label}
+                  </button>
+                );
+              },
+            )}
+          </div>
         </div>
         <div className="flex flex-col gap-2">
           <label className="text-xl font-bold">시간 제한 (ms)</label>

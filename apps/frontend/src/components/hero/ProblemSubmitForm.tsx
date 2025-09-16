@@ -6,14 +6,32 @@ import { useTheme } from "next-themes";
 
 import axios from "axios";
 import Editor from "@monaco-editor/react";
+import { FaJava } from "react-icons/fa";
+import { SiC, SiCplusplus, SiPython } from "react-icons/si";
 
 import Checkbox from "@components/Checkbox";
+import { Language } from "@lib/types";
 
 const ProblemSubmitForm: React.FC<{
   userId: string;
   problemId: string;
   defaultCode: string;
-}> = ({ userId, problemId, defaultCode }) => {
+  availableLanguages: Language[];
+}> = ({ userId, problemId, defaultCode, availableLanguages }) => {
+  const getLanguageIcon = (lang: Language) => {
+    switch (lang) {
+      case "python":
+        return <SiPython className="text-blue-500" />;
+      case "c":
+        return <SiC className="text-cyan-700" />;
+      case "cpp":
+        return <SiCplusplus className="text-blue-700" />;
+      case "java":
+        return <FaJava className="text-orange-600" />;
+      default:
+        return null;
+    }
+  };
   const { theme } = useTheme();
   const router = useRouter();
   const [editorTheme, setEditorTheme] = useState("light");
@@ -26,6 +44,7 @@ const ProblemSubmitForm: React.FC<{
   const [visibility, setVisibility] = useState<
     "public" | "private" | "correct"
   >("public");
+  const [language, setLanguage] = useState<Language>(availableLanguages[0]);
 
   return (
     <div className="flex flex-col gap-8 w-full xl:w-4/5 mx-auto">
@@ -60,6 +79,28 @@ const ProblemSubmitForm: React.FC<{
 
       <div className="flex flex-col md:flex-row w-full gap-4">
         <div className="min-w-[6rem] text-left md:text-right pt-1 whitespace-nowrap">
+          언어 선택
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {availableLanguages.map((lang) => (
+            <button
+              key={lang}
+              onClick={() => setLanguage(lang)}
+              className={`flex items-center gap-1 px-3 py-1 rounded-md border text-sm transition-all transform duration-200 ${
+                lang === language
+                  ? "bg-primary text-white border-primary scale-105"
+                  : "bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-black dark:text-white hover:scale-105"
+              }`}
+            >
+              {getLanguageIcon(lang)}
+              {lang}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex flex-col md:flex-row w-full gap-4">
+        <div className="min-w-[6rem] text-left md:text-right pt-1 whitespace-nowrap">
           소스 코드
         </div>
         <Editor
@@ -83,7 +124,7 @@ const ProblemSubmitForm: React.FC<{
               userId,
               problemId,
               code,
-              language: "c",
+              language,
               visibility,
             })
             .then((res) => {
