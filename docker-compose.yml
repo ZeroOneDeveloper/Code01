@@ -26,6 +26,7 @@ services:
       - /sys/fs/cgroup
       - /run
       - /tmp
+    privileged: true
     restart: unless-stopped
 
   frontend:
