@@ -31,6 +31,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     protobuf-compiler \
     libprotobuf-dev \
     pkg-config \
+    libnl-3-dev \
+    libnl-route-3-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # nsjail 설치
