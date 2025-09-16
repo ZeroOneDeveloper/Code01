@@ -16,11 +16,15 @@ services:
       retries: 10
     cap_add:
       - SYS_ADMIN
+      - SYS_PTRACE
     security_opt:
       - seccomp=unconfined
+    devices:
+      - /dev/random:/dev/random
     tmpfs:
       - /sys/fs/cgroup
       - /run
+      - /tmp
     restart: unless-stopped
 
   frontend:

@@ -26,14 +26,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-RUN git clone https://github.com/ioi/isolate.git /opt/isolate
-WORKDIR /opt/isolate
-RUN make install
-
-RUN groupadd -g 1337 isolate_box && \
-    useradd -u 1337 -g 1337 -d /var/local/lib/isolate -m -s /bin/bash isolate_box
-
-RUN mkdir -p /run/isolate && /opt/isolate/isolate --cg --init || true
+RUN git clone https://github.com/google/nsjail.git /opt/nsjail && \
+    cd /opt/nsjail && \
+    make
 
 WORKDIR /app
 COPY requirements.txt ./
