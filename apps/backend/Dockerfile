@@ -28,6 +28,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     flex \
     bison \
+    protobuf-compiler \
+    libprotobuf-dev \
+    pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
 # nsjail 설치
