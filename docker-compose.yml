@@ -38,10 +38,8 @@ services:
       - apparmor:unconfined
     devices:
       - /dev/random:/dev/random
-    tmpfs:
-      - /sys/fs/cgroup
-      - /run
-      - /tmp
+    volumes:
+      - tmp-volume:/tmp
     privileged: true
     restart: unless-stopped
 
@@ -61,3 +59,4 @@ services:
 
 volumes:
   piston-data:
+  tmp-volume:
