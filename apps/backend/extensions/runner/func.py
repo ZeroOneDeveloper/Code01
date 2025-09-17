@@ -15,6 +15,16 @@ LANGUAGE_VERSION_MAP = {
     "rust": "1.68.2",
 }
 
+LANGUAGE_FILENAME_MAP = {
+    "c": "main.c",
+    "cpp": "main.cpp",
+    "python": "main.py",
+    "javascript": "main.js",
+    "java": "Main.java",
+    "go": "main.go",
+    "rust": "main.rs",
+}
+
 async def run_code_in_background(
     supabase: AsyncClient,
     pendingId: int,
@@ -50,10 +60,10 @@ async def run_code_in_background(
                     payload = {
                         "language": language,
                         "version": LANGUAGE_VERSION_MAP.get(language, "*"),
-                        "files": [{"content": code}],
+                        "files": [{"name": LANGUAGE_FILENAME_MAP.get(language, "main.txt"), "content": code}],
                         "stdin": test_case.get("input", ""),
                         "run_timeout": time_limit_sec * 1000,  # Piston uses milliseconds
-                        "mem_limit": memory_limit_mb * 1024 * 1024, # Piston uses bytes
+                        "run_memory_limit": memory_limit_mb * 1024 * 1024, # Piston uses bytes
                     }
                     
                     response = await client.post(f"{PISTON_API_URL}/api/v2/execute", json=payload, timeout=time_limit_sec + 5)

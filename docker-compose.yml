@@ -1,18 +1,15 @@
 services:
   piston:
     image: ghcr.io/engineer-man/piston
-    container_name: code01-piston
+    container_name: piston_api
+    restart: always
+    privileged: true
     ports:
-      - "2000:2000"
-    # 임시 파일용으로 메모리 기반 파일 시스템을 마운트합니다.
-    tmpfs:
-      - /tmp
+        - 2000:2000
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - piston-data:/piston
-    user: "root"
-    restart: unless-stopped
-
+        - ./data/piston/packages:/piston/packages
+    tmpfs:
+        - /tmp:exec
   backend:
     build:
       context: apps/backend/
@@ -39,7 +36,8 @@ services:
     devices:
       - /dev/random:/dev/random
     volumes:
-      - tmp-volume:/tmp
+      - piston-data:/piston
+      - isolate-data:/app/isolate
     privileged: true
     restart: unless-stopped
 
@@ -59,4 +57,4 @@ services:
 
 volumes:
   piston-data:
-  tmp-volume:
+  isolate-data:
