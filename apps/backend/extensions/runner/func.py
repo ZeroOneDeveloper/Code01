@@ -62,8 +62,11 @@ async def run_code_in_background(
                         "version": LANGUAGE_VERSION_MAP.get(language, "*"),
                         "files": [{"name": LANGUAGE_FILENAME_MAP.get(language, "main.txt"), "content": code}],
                         "stdin": test_case.get("input", ""),
+                        "args": [],
+                        "compile_timeout": 10000,
                         "run_timeout": time_limit_sec * 1000,  # Piston uses milliseconds
-                        "run_memory_limit": memory_limit_mb * 1024 * 1024, # Piston uses bytes
+                        "compile_memory_limit": -1,
+                        "run_memory_limit": memory_limit_mb * 1024 * 1024,  # Piston uses bytes
                     }
                     
                     response = await client.post(f"{PISTON_API_URL}/api/v2/execute", json=payload, timeout=time_limit_sec + 5)
