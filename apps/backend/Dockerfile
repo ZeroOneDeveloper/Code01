@@ -1,51 +1,34 @@
-FROM python:3.13
+FROM python:3.11-slim
 
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
-
-# apt 소스 업데이트
-RUN echo "deb http://deb.debian.org/debian trixie main contrib non-free" > /etc/apt/sources.list && \
-    echo "deb http://deb.debian.org/debian trixie-updates main contrib non-free" >> /etc/apt/sources.list && \
-    echo "deb http://security.debian.org/debian-security trixie-security main contrib non-free" >> /etc/apt/sources.list
-
-# 필수 패키지 설치 (flex, bison 포함)
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# 필수 패키지 설치
+RUN apt update && apt install -y \
     build-essential \
-    fakeroot \
-    sudo \
     git \
-    gcc \
-    g++ \
-    default-jdk-headless \
-    nodejs \
-    npm \
-    golang \
-    rustc \
-    libcap-dev \
-    libseccomp-dev \
-    libsystemd-dev \
-    pkg-config \
-    curl \
+    python3 \
+    python3-pip \
+    python3-venv \
     flex \
     bison \
-    protobuf-compiler \
     libprotobuf-dev \
-    pkg-config \
+    protobuf-compiler \
     libnl-3-dev \
     libnl-route-3-dev \
-    && rm -rf /var/lib/apt/lists/*
+    pkg-config
 
-# nsjail 설치
+# nsjail 다운로드 및 빌드 (이제 Piston을 사용하므로 이 부분은 제거해도 괜찮습니다)
 RUN git clone https://github.com/google/nsjail.git /opt/nsjail && \
     cd /opt/nsjail && \
-    make
+    make && \
+    cp nsjail /usr/local/bin/nsjail
 
-# 작업 디렉토리 및 Python 패키지 설치
+# 작업 디렉토리 설정
 WORKDIR /app
-COPY requirements.txt ./
-RUN pip3 install --no-cache-dir -r requirements.txt
+
+# 캐시 효율을 위해 requirements.txt를 먼저 복사하고 패키지를 설치합니다.
+COPY requirements.txt .
+RUN pip install -r requirements.txt
+
+# 나머지 소스 코드를 복사합니다.
 COPY . .
 
-EXPOSE 3001
-
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "3001"]
+CMD ["python", "main.py"]
