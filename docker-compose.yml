@@ -1,15 +1,18 @@
 services:
   piston:
     image: ghcr.io/engineer-man/piston
-    container_name: piston_api
+    container_name: code01-piston
     restart: always
     privileged: true
     ports:
-        - 2000:2000
+      - 2000:2000
     volumes:
-        - ./data/piston/packages:/piston/packages
+      - ./data/piston/packages:/piston/packages
     tmpfs:
-        - /tmp:exec
+      - /tmp:exec
+    environment:
+      - PISTON_RUN_TIMEOUT=20000
+
   backend:
     build:
       context: apps/backend/
@@ -23,11 +26,6 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
       - PISTON_API_URL=http://piston:2000
-    healthcheck:
-      test: [ "CMD-SHELL", "curl -fsS http://127.0.0.1:3001 || exit 1" ]
-      interval: 10s
-      timeout: 3s
-      retries: 10
     cap_add:
       - SYS_ADMIN
     security_opt:
