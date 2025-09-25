@@ -168,12 +168,25 @@ const SubmissionCodePage: React.FC = () => {
     }
   };
 
+  // Map language to filename for download
+  const LANGUAGE_FILENAME_MAP: Record<string, string> = {
+    c: "main.c",
+    cpp: "main.cpp",
+    python: "main.py",
+    java: "Main.java",
+  };
   const handleDownload = () => {
     try {
       const blob = new Blob([code || ""], { type: "text/plain;charset=utf-8" });
       const a = document.createElement("a");
+      // Use mapped filename, fallback to txt
+      const lang = submission?.language;
+      const filename =
+        lang && LANGUAGE_FILENAME_MAP[lang]
+          ? LANGUAGE_FILENAME_MAP[lang]
+          : `submission_${String(params.submissionId)}.txt`;
       a.href = URL.createObjectURL(blob);
-      a.download = `submission_${String(params.submissionId)}.c`;
+      a.download = filename;
       document.body.appendChild(a);
       a.click();
       a.remove();
