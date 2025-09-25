@@ -36,18 +36,17 @@ const ProblemSubmitForm: React.FC<{
   const router = useRouter();
   const [editorTheme, setEditorTheme] = useState("light");
   const [code, setCode] = useState<string>(defaultCode);
-
-  useEffect(() => {
-    setEditorTheme(theme === "dark" ? "vs-dark" : "light");
-  }, [theme]);
-
   const [visibility, setVisibility] = useState<
     "public" | "private" | "correct"
   >("public");
   const [language, setLanguage] = useState<Language>(availableLanguages[0]);
 
+  useEffect(() => {
+    setEditorTheme(theme === "dark" ? "vs-dark" : "light");
+  }, [theme]);
+
   return (
-    <div className="flex flex-col gap-8 w-full xl:w-4/5 mx-auto">
+    <div className="flex flex-col gap-8 w-full mx-auto">
       <div className="flex flex-col md:flex-row w-full gap-4">
         <div className="min-w-[6rem] text-left md:text-right pt-1 whitespace-nowrap">
           제출 여부 공개
@@ -105,7 +104,8 @@ const ProblemSubmitForm: React.FC<{
         </div>
         <Editor
           height="30vh"
-          defaultLanguage="c"
+          key={language}
+          defaultLanguage={language}
           value={code}
           onChange={(value) => value && setCode(value)}
           theme={editorTheme}

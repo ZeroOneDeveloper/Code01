@@ -344,7 +344,7 @@ const SubmissionCodePage: React.FC = () => {
           {code ? (
             <Editor
               height={editorHeight}
-              defaultLanguage="c"
+              defaultLanguage={submission.language}
               value={code}
               onChange={(value) => value && setCode(value)}
               theme={editorTheme}
