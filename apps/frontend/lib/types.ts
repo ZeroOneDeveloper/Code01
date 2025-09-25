@@ -58,6 +58,7 @@ export interface Problem {
   deadline?: string | null;
   grade: "expert" | "advanced" | "intermediate" | "beginner";
   available_languages: Language[];
+  source?: string;
 }
 
 export interface TestCase {

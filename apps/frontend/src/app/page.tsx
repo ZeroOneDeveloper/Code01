@@ -103,7 +103,8 @@ export default async function Home() {
                   <colgroup>
                     <col className="w-16" />
                     <col className="w-64" />
-                    <col className="w-64" />
+                    <col className="w-32" />
+                    <col className="w-24" />
                     <col className="w-24" />
                     <col className="w-24" />
                     <col className="w-24" />
@@ -116,6 +117,9 @@ export default async function Home() {
                       </th>
                       <th className="px-4 py-2 text-left font-semibold text-gray-700 dark:text-gray-200 border-b">
                         문제 제목
+                      </th>
+                      <th className="px-4 py-2 text-left font-semibold text-gray-700 dark:text-gray-200 border-b">
+                        출처
                       </th>
                       <th className="px-4 py-2 text-left font-semibold text-gray-700 dark:text-gray-200 border-b">
                         업로더
@@ -150,6 +154,9 @@ export default async function Home() {
                           >
                             {problem.title}
                           </a>
+                        </td>
+                        <td className="px-4 py-2 text-gray-700 dark:text-gray-300">
+                          {problem.source || "-"}
                         </td>
                         <td className="px-4 py-2 text-gray-700 dark:text-gray-300">
                           {userMap[problem.created_by] ?? "-"}
