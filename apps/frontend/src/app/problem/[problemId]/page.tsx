@@ -166,7 +166,7 @@ const ProblemPage: React.FC<{
         </ul>
       </div>
       <div className="flex flex-col gap-4">
-        <h2 className="text-2xl font-semibold border-b-2 border-primary w-fit">
+        <h2 className="text-2xl font-semibold border-b-2 border-primary w-fit whitespace-pre-line">
           입력
         </h2>
         <div>
@@ -176,7 +176,7 @@ const ProblemPage: React.FC<{
         </div>
       </div>
       <div className="flex flex-col gap-4">
-        <h2 className="text-2xl font-semibold border-b-2 border-primary w-fit">
+        <h2 className="text-2xl font-semibold border-b-2 border-primary w-fit whitespace-pre-line">
           출력
         </h2>
         <div className="whitespace-pre-line">{data.output_description}</div>
