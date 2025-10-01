@@ -198,7 +198,7 @@ const ProblemPage: React.FC<{
           <div className="flex flex-1 flex-col gap-2">
             <div className="flex items-center gap-4 border-b-2 border-primary w-fit">
               <h2 className="text-2xl font-semibold">예제 출력 {index + 1}</h2>
-              <CopyButton text={sample_input} />
+              <CopyButton text={data.sample_outputs[index]} />
             </div>
             <pre className="bg-gray-800 text-white p-4 rounded-md whitespace-pre-wrap">
               {data.sample_outputs[index]}
