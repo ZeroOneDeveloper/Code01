@@ -149,7 +149,7 @@ const ProblemPage: React.FC<{
         <h2 className="text-2xl font-semibold border-b-2 border-primary w-fit">
           설명
         </h2>
-        <div>{data.description}</div>
+        <div className="whitespace-pre-wrap">{data.description}</div>
       </div>
       <div className="flex flex-col gap-4">
         <h2 className="text-2xl font-semibold border-b-2 border-primary w-fit">
@@ -166,20 +166,20 @@ const ProblemPage: React.FC<{
         </ul>
       </div>
       <div className="flex flex-col gap-4">
-        <h2 className="text-2xl font-semibold border-b-2 border-primary w-fit whitespace-pre-line">
+        <h2 className="text-2xl font-semibold border-b-2 border-primary w-fit ">
           입력
         </h2>
-        <div>
+        <div className="whitespace-pre-wrap">
           {data.input_description
             ? data.input_description
             : "입력 설명이 없습니다."}
         </div>
       </div>
       <div className="flex flex-col gap-4">
-        <h2 className="text-2xl font-semibold border-b-2 border-primary w-fit whitespace-pre-line">
+        <h2 className="text-2xl font-semibold border-b-2 border-primary w-fit">
           출력
         </h2>
-        <div className="whitespace-pre-line">{data.output_description}</div>
+        <div className="whitespace-pre-wrap">{data.output_description}</div>
       </div>
       {data.sample_inputs.map((sample_input: string, index: number) => (
         <div
