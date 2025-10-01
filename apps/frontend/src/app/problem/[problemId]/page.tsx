@@ -179,7 +179,7 @@ const ProblemPage: React.FC<{
         <h2 className="text-2xl font-semibold border-b-2 border-primary w-fit">
           출력
         </h2>
-        <div>{data.output_description}</div>
+        <div className="whitespace-pre-line">{data.output_description}</div>
       </div>
       {data.sample_inputs.map((sample_input: string, index: number) => (
         <div
