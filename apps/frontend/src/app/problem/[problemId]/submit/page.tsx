@@ -2,6 +2,7 @@ import React from "react";
 
 import { createClient } from "@lib/supabase/server";
 import ProblemSubmitForm from "@components/hero/ProblemSubmitForm";
+import { redirect } from "next/navigation";
 
 const isNumeric = (value: string) => /^\d+$/.test(value);
 
@@ -18,7 +19,13 @@ const ProblemSubmitPage: React.FC<{
     .eq("id", isNumeric(problemId) ? parseInt(problemId, 10) : problemId)
     .maybeSingle();
 
-  const userId = (await supabase.auth.getUser()).data.user!.id;
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    redirect("/login");
+  }
+  const userId = user.id;
 
   const deadline = (data?.deadline as string | null) ?? null;
   const isPastDeadline =

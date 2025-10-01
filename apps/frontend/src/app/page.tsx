@@ -7,89 +7,88 @@ export default async function Home() {
   const supabase = await createClient();
   const { user } = (await supabase.auth.getUser()).data;
 
-  if (user) {
-    // Fetch all problems
-    const { data: problems } = await supabase
-      .from("problems")
-      .select("*")
-      .order("created_at", { ascending: false });
+  // Fetch all problems
+  const { data: problems } = await supabase
+    .from("problems")
+    .select("*")
+    .order("created_at", { ascending: false });
 
-    // Batch-fetch submission stats and user names
-    const problemIds = problems?.map((p) => p.id) ?? [];
+  // Batch-fetch submission stats and user names
+  const problemIds = problems?.map((p) => p.id) ?? [];
 
-    const { data: submissions } = await supabase
-      .from("problem_submissions")
-      .select("problem_id, is_correct")
-      .in("problem_id", problemIds);
+  const { data: submissions } = await supabase
+    .from("problem_submissions")
+    .select("problem_id, is_correct")
+    .in("problem_id", problemIds);
 
-    const { data: users } = await supabase.from("users").select("id, name");
+  const { data: users } = await supabase.from("users").select("id, name");
 
-    const userMap = Object.fromEntries(
-      (users ?? []).map((u) => [u.id, u.name]),
-    );
-    const statsMap: Record<
-      number,
-      { solved: number; submitted: number; accuracy: number }
-    > = {};
+  const userMap = Object.fromEntries((users ?? []).map((u) => [u.id, u.name]));
+  const statsMap: Record<
+    number,
+    { solved: number; submitted: number; accuracy: number }
+  > = {};
 
-    for (const id of problemIds) {
-      const related = submissions?.filter((s) => s.problem_id === id) ?? [];
-      const submitted = related.length;
-      const solved = related.filter((s) => s.is_correct).length;
-      const accuracy = submitted ? (solved / submitted) * 100 : 0;
-      statsMap[id] = { solved, submitted, accuracy };
-    }
+  for (const id of problemIds) {
+    const related = submissions?.filter((s) => s.problem_id === id) ?? [];
+    const submitted = related.length;
+    const solved = related.filter((s) => s.is_correct).length;
+    const accuracy = submitted ? (solved / submitted) * 100 : 0;
+    statsMap[id] = { solved, submitted, accuracy };
+  }
 
-    // Cache for organizations to avoid duplicate queries
-    const organizations: Record<
-      string,
-      { id: string; name: string; is_private: boolean }
-    > = {};
+  // Cache for organizations to avoid duplicate queries
+  const organizations: Record<
+    string,
+    { id: string; name: string; is_private: boolean }
+  > = {};
 
-    // Filter and group visible problems
-    const visibleProblems: {
-      [orgId: string]: { name: string; problems: Problem[] };
-    } = {};
+  // Filter and group visible problems
+  const visibleProblems: {
+    [orgId: string]: { name: string; problems: Problem[] };
+  } = {};
 
-    if (problems) {
-      for (const problem of problems) {
-        if (problem.organization_id) {
-          let org = organizations[String(problem.organization_id)];
-          if (!org) {
-            const { data: orgData } = await supabase
-              .from("organizations")
-              .select("id, name, is_private")
-              .eq("id", problem.organization_id)
-              .maybeSingle();
-            if (!orgData) continue;
-            org = orgData;
-            organizations[String(org.id)] = org;
-          }
-
-          if (org.is_private) {
-            const { count } = await supabase
-              .from("organization_members")
-              .select("*", { count: "exact", head: true })
-              .eq("organization_id", org.id)
-              .eq("user_id", user.id);
-            if (!count) continue;
-          }
-
-          const key = String(org.id);
-          if (!visibleProblems[key]) {
-            visibleProblems[key] = { name: org.name, problems: [] };
-          }
-          visibleProblems[key].problems.push(problem);
-        } else {
-          const key = "public";
-          if (!visibleProblems[key]) {
-            visibleProblems[key] = { name: "공개 문제", problems: [] };
-          }
-          visibleProblems[key].problems.push(problem);
+  if (problems) {
+    for (const problem of problems) {
+      if (problem.organization_id) {
+        let org = organizations[String(problem.organization_id)];
+        if (!org) {
+          const { data: orgData } = await supabase
+            .from("organizations")
+            .select("id, name, is_private")
+            .eq("id", problem.organization_id)
+            .maybeSingle();
+          if (!orgData) continue;
+          org = orgData;
+          organizations[String(org.id)] = org;
         }
+
+        if (org.is_private) {
+          if (!user) continue;
+          const { count } = await supabase
+            .from("organization_members")
+            .select("*", { count: "exact", head: true })
+            .eq("organization_id", org.id)
+            .eq("user_id", user.id);
+          if (!count) continue;
+        }
+
+        const key = String(org.id);
+        if (!visibleProblems[key]) {
+          visibleProblems[key] = { name: org.name, problems: [] };
+        }
+        visibleProblems[key].problems.push(problem);
+      } else {
+        const key = "public";
+        if (!visibleProblems[key]) {
+          visibleProblems[key] = { name: "공개 문제", problems: [] };
+        }
+        visibleProblems[key].problems.push(problem);
       }
     }
+  }
 
+  if (Object.keys(visibleProblems).length > 0) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center py-44 gap-8">
         {Object.entries(visibleProblems).map(([orgId, group]) => (
