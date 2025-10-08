@@ -40,6 +40,7 @@ const ProblemSubmitForm: React.FC<{
     "public" | "private" | "correct"
   >("public");
   const [language, setLanguage] = useState<Language>(availableLanguages[0]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     setEditorTheme(theme === "dark" ? "vs-dark" : "light");
@@ -117,8 +118,14 @@ const ProblemSubmitForm: React.FC<{
       </div>
 
       <button
-        className="bg-primary w-fit px-4 py-2"
+        disabled={isSubmitting}
+        aria-busy={isSubmitting}
+        className={`bg-primary w-fit px-4 py-2 rounded-md text-white font-semibold transition-transform duration-200 hover:scale-105 flex items-center gap-2 ${
+          isSubmitting ? "opacity-60 cursor-not-allowed" : ""
+        }`}
         onClick={() => {
+          if (isSubmitting) return;
+          setIsSubmitting(true);
           axios
             .post(`${process.env.NEXT_PUBLIC_API_URL}/runner/`, {
               userId,
@@ -132,10 +139,33 @@ const ProblemSubmitForm: React.FC<{
               router.push(
                 `/problem/${problemId}/submissions?user_id=true&pendingId=${pendingId}`,
               );
-            });
+            })
+            .finally(() => setIsSubmitting(false));
         }}
       >
-        제출
+        {isSubmitting && (
+          <svg
+            className="h-4 w-4 animate-spin"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <circle
+              className="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              strokeWidth="4"
+              fill="none"
+            ></circle>
+            <path
+              className="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+            ></path>
+          </svg>
+        )}
+        {isSubmitting ? "제출 중..." : "제출"}
       </button>
     </div>
   );
