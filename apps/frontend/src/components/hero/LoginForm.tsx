@@ -29,9 +29,12 @@ const LoginForm = () => {
 
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     supabase.auth
       .signInWithPassword({
         email,
@@ -50,6 +53,7 @@ const LoginForm = () => {
             theme: theme === "dark" ? "dark" : "light",
             transition: Bounce,
           });
+          setIsSubmitting(false);
         } else {
           window.location.replace("/");
         }
@@ -88,9 +92,38 @@ const LoginForm = () => {
       </div>
       <button
         type="submit"
-        className="bg-primary text-white px-4 py-2 rounded-lg font-bold transition-all duration-300 ease-in-out hover:scale-110 shadow-md hover:cursor-pointer"
+        disabled={isSubmitting}
+        aria-busy={isSubmitting}
+        className={
+          `px-4 py-2 rounded-lg font-bold transition-all duration-300 ease-in-out shadow-md flex items-center justify-center gap-2 ` +
+          (isSubmitting
+            ? "bg-gray-300 text-gray-600 dark:bg-gray-700 dark:text-gray-300 cursor-not-allowed hover:scale-100"
+            : "bg-primary text-white hover:scale-110 hover:cursor-pointer")
+        }
       >
-        로그인
+        {isSubmitting && (
+          <svg
+            className="h-4 w-4 animate-spin"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <circle
+              className="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              strokeWidth="4"
+              fill="none"
+            ></circle>
+            <path
+              className="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+            ></path>
+          </svg>
+        )}
+        {isSubmitting ? "처리중..." : "로그인"}
       </button>
       <h1 className="text-right text-sm text-gray-500">
         계정이 없으신가요?{" "}
