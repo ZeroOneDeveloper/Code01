@@ -35,7 +35,7 @@ export default async function ProblemPageLayout({
 
   return (
     <div className="min-h-screen flex items-center justify-center py-44">
-      <div className="flex flex-col gap-8 w-5/6 md:w-2/3 mx-auto">
+      <div className="flex flex-col gap-8 w-5/6 md:w-3/5 2xl:w-2/5 mx-auto">
         <ProblemTabs />
         {children}
       </div>

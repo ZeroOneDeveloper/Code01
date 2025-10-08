@@ -93,7 +93,7 @@ const ProblemPage: React.FC<{
   })();
 
   return (
-    <div className="mx-auto w-full max-w-5xl px-4 flex flex-col gap-8">
+    <div className="mx-auto w-full px-4 flex flex-col gap-8">
       <h1 className="text-4xl font-bold">{data.title}</h1>
       {isPastDeadline && (
         <div className="rounded-md border border-rose-500/40 bg-rose-500/10 text-rose-200 px-4 py-3">
@@ -216,6 +216,10 @@ const ProblemPage: React.FC<{
               key: "문제를 만든 사람",
               value: data.creator,
             },
+            {
+              key: "원본 문제",
+              value: data.source,
+            },
           ].map(
             (
               data: {
@@ -223,11 +227,14 @@ const ProblemPage: React.FC<{
                 value: string;
               },
               index: number,
-            ) => (
-              <li key={index} className="mb-2">
-                {data.key}: {data.value}
-              </li>
-            ),
+            ) => {
+              if (!data.value) return null;
+              return (
+                <li key={index} className="mb-2">
+                  {data.key}: {data.value}
+                </li>
+              );
+            },
           )}
         </ul>
       </div>

@@ -92,7 +92,7 @@ const ProblemTabs: React.FC = () => {
             }}
             title={item.disabled ? "마감되어 제출할 수 없습니다." : undefined}
             aria-disabled={item.disabled || undefined}
-            className={`text-black cursor-pointer dark:text-white px-6 py-2 font-medium ${
+            className={`text-black cursor-pointer dark:text-white px-6 py-2 font-medium whitespace-nowrap ${
               item.isActive
                 ? "text-white bg-primary"
                 : item.disabled
