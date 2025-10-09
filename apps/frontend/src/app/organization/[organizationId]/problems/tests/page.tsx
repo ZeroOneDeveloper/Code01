@@ -455,14 +455,14 @@ export default function ProblemTestsPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
-            <label className="text-sm font-medium">개수 (100~10000)</label>
+            <label className="text-sm font-medium">개수 (100~1000)</label>
             <input
               type="number"
               className="w-full mt-1 p-2 border rounded-md bg-white dark:bg-neutral-900 text-black dark:text-white"
               value={count}
               onChange={(e) => setCount(Number(e.target.value))}
               min={100}
-              max={10000}
+              max={1000}
             />
           </div>
           <div>
