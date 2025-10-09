@@ -181,7 +181,7 @@ const SubmissionsPage: React.FC = () => {
   const accepted = submissions.filter((s) => s.is_correct).length;
 
   return (
-    <div className="px-4 py-6 space-y-4">
+    <div className="py-6 space-y-4">
       {/* Header */}
       <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
         <div className="space-y-1">
@@ -249,22 +249,36 @@ const SubmissionsPage: React.FC = () => {
 
       {/* Table */}
       <div className="overflow-x-auto rounded-md border">
-        <table className="w-full text-sm">
+        <table className="w-full text-sm align-middle">
           <thead className="bg-muted/50">
-            <tr>
-              <th className="p-2 text-center tabular-nums">제출 번호</th>
-              <th className="p-2 text-center">문제</th>
-              <th className="p-2 text-center">사용자</th>
-              <th className="p-2 text-center">결과</th>
-              <th className="p-2 text-center tabular-nums whitespace-nowrap">
+            <tr className="align-middle">
+              <th className="p-2 text-center tabular-nums align-middle whitespace-nowrap">
+                제출 번호
+              </th>
+              <th className="p-2 text-center align-middle whitespace-nowrap">
+                문제
+              </th>
+              <th className="p-2 text-center align-middle whitespace-nowrap">
+                사용자
+              </th>
+              <th className="p-2 text-center align-middle whitespace-nowrap">
+                결과
+              </th>
+              <th className="p-2 text-center tabular-nums whitespace-nowrap align-middle">
                 시간
               </th>
-              <th className="p-2 text-center tabular-nums whitespace-nowrap">
+              <th className="p-2 text-center tabular-nums whitespace-nowrap align-middle">
                 메모리
               </th>
-              <th className="p-2 text-center tabular-nums">케이스</th>
-              <th className="p-2 text-center">코드</th>
-              <th className="p-2 text-center whitespace-nowrap">제출시각</th>
+              <th className="p-2 text-center tabular-nums whitespace-nowrap align-middle">
+                케이스
+              </th>
+              <th className="p-2 text-center align-middle whitespace-nowrap">
+                코드
+              </th>
+              <th className="p-2 text-center whitespace-nowrap align-middle">
+                제출시각
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -298,9 +312,11 @@ const SubmissionsPage: React.FC = () => {
                   problemTitleById.get(s.problem_id) ||
                   `Problem #${s.problem_id}`;
                 return (
-                  <tr key={s.id} className="border-t">
-                    <td className="p-2 tabular-nums text-center">{s.id}</td>
-                    <td className="p-2 text-center">
+                  <tr key={s.id} className="border-t align-middle">
+                    <td className="p-2 tabular-nums text-center align-middle">
+                      {s.id}
+                    </td>
+                    <td className="p-2 text-center align-middle">
                       <Link
                         className="underline underline-offset-4 inline-block max-w-[14rem] truncate align-middle"
                         href={`/problem/${s.problem_id}`}
@@ -308,24 +324,24 @@ const SubmissionsPage: React.FC = () => {
                         {problemTitle}
                       </Link>
                     </td>
-                    <td className="p-2 text-center">
+                    <td className="p-2 text-center align-middle">
                       {nicknames[s.user_id] || s.user_id.slice(0, 8)}
                     </td>
-                    <td className="p-2 text-center">
-                      <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs">
+                    <td className="p-2 text-center align-middle">
+                      <span className="inline-flex items-center justify-center rounded-full border px-2 py-0.5 text-xs whitespace-nowrap w-[5.5rem]">
                         {toStatusKo(s.status_code)}
                       </span>
                     </td>
-                    <td className="p-2 tabular-nums text-center whitespace-nowrap">
+                    <td className="p-2 tabular-nums text-center whitespace-nowrap align-middle">
                       {s.time_ms ?? "-"} ms
                     </td>
-                    <td className="p-2 tabular-nums text-center whitespace-nowrap">
+                    <td className="p-2 tabular-nums text-center whitespace-nowrap align-middle">
                       {s.memory_kb ?? "-"} KB
                     </td>
-                    <td className="p-2 tabular-nums text-center">
+                    <td className="p-2 tabular-nums text-center align-middle">
                       {s.cases_done ?? 0}/{s.cases_total ?? 0}
                     </td>
-                    <td className="p-2 text-center">
+                    <td className="p-2 text-center align-middle">
                       <Link
                         href={`/problem/${s.problem_id}/submissions/${s.id}`}
                         className="font-semibold text-blue-600 dark:text-blue-400 hover:underline"
@@ -333,7 +349,7 @@ const SubmissionsPage: React.FC = () => {
                         조회
                       </Link>
                     </td>
-                    <td className="p-2 text-center text-muted-foreground whitespace-nowrap">
+                    <td className="p-2 text-center text-muted-foreground whitespace-nowrap align-middle">
                       {new Date(s.submitted_at).toLocaleString("ko-KR", {
                         timeZone: "Asia/Seoul",
                       })}
