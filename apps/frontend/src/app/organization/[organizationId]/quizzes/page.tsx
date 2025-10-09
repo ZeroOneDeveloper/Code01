@@ -82,7 +82,7 @@ export default function QuizzesIndexPage() {
   }, [rows, search, statusFilter]);
 
   return (
-    <div className="max-w-6xl mx-auto p-4 space-y-6">
+    <div className="w-full mx-auto p-4 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between gap-3">
         <h1 className="text-xl font-semibold">퀴즈</h1>
