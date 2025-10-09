@@ -36,32 +36,43 @@ async def run_code(
         os.getenv("SUPABASE_PUBLISHABLE_KEY"),
     )
 
-    inserted = await supabase.table("problem_submissions").insert(
-        {
-            "user_id": problem_submission.userId,
-            "problem_id": problem_submission.problemId,
-            "status_code": 0,
-            "code": problem_submission.code,
-            "language": problem_submission.language,
-            "stdout_list": [],
-            "stderr_list": [],
-            "time_ms": 0,
-            "memory_kb": 0.0,
-            "passed_all": False,
-            "is_correct": False,
-            "passed_time_limit": False,
-            "passed_memory_limit": False,
-            "visibility": problem_submission.visibility,
-            "cases_total": 0,
-            "cases_done": 0,
-        }
-    ).execute()
+    inserted = (
+        await supabase.table("problem_submissions")
+        .insert(
+            {
+                "user_id": problem_submission.userId,
+                "problem_id": problem_submission.problemId,
+                "status_code": 0,
+                "code": problem_submission.code,
+                "language": problem_submission.language,
+                "stdout_list": [],
+                "stderr_list": [],
+                "time_ms": 0,
+                "memory_kb": 0.0,
+                "passed_all": False,
+                "is_correct": False,
+                "passed_time_limit": False,
+                "passed_memory_limit": False,
+                "visibility": problem_submission.visibility,
+                "cases_total": 0,
+                "cases_done": 0,
+            }
+        )
+        .execute()
+    )
     background_tasks.add_task(
         run_code_in_background,
         supabase,
-        int(inserted.data[0]['id']),
+        int(inserted.data[0]["id"]),
         problem_submission.code,
         problem_submission.language,
-        int(problem_submission.problemId) if problem_submission.problemId.isdigit() else problem_submission.problemId,
+        (
+            int(problem_submission.problemId)
+            if problem_submission.problemId.isdigit()
+            else problem_submission.problemId
+        ),
     )
-    return {"message": "Code is being processed in the background.", "pendingId": inserted.data[0]['id']}
+    return {
+        "message": "Code is being processed in the background.",
+        "pendingId": inserted.data[0]["id"],
+    }

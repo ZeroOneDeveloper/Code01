@@ -13,7 +13,8 @@ app.add_middleware(
     allow_origins=[
         "https://code01.kr",
         "http://localhost:3000",
-    ],  # Allow all origins
+        # "*"
+    ],
     allow_credentials=True,
     allow_methods=["*"],  # Allow all methods
     allow_headers=["*"],  # Allow all headers
