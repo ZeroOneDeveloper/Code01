@@ -573,7 +573,7 @@ int main(void) {
         <div className="text-gray-600 dark:text-gray-400 text-sm">
           모든 정보를 입력한 후{" "}
           <strong className="text-black dark:text-white">
-            &quot;생성&quot;
+            &quot;{isEditing ? "수정" : "생성"}&quot;
           </strong>{" "}
           버튼을 눌러 문제를 등록하세요.
         </div>
