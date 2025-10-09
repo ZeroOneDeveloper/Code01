@@ -575,172 +575,205 @@ int main(void) {
           <strong className="text-black dark:text-white">
             &quot;{isEditing ? "수정" : "생성"}&quot;
           </strong>{" "}
-          버튼을 눌러 문제를 등록하세요.
+          버튼을 눌러 문제를 {isEditing ? "수정" : "등록"}하세요.
         </div>
-        <button
-          disabled={loadingExisting}
-          className={
-            "bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition self-end md:self-auto" +
-            (loadingExisting ? " opacity-60 cursor-not-allowed" : "")
-          }
-          onClick={async () => {
-            if (
-              !title ||
-              !description ||
-              !publishedAt ||
-              !inputDescription ||
-              !outputDescription ||
-              availableLanguages.length == 0 ||
-              !grade
-            ) {
-              toast.error("모든 필수 정보를 입력하세요.", {
-                position: "top-right",
-                autoClose: 5000,
-                hideProgressBar: false,
-                closeOnClick: false,
-                pauseOnHover: true,
-                draggable: true,
-                progress: undefined,
-                theme: theme === "dark" ? "dark" : "light",
-                transition: Bounce,
-              });
-              return;
+        <div className="flex flex-col gap-2 md:flex-row md:gap-2 md:items-center">
+          {isEditing && (
+            <button
+              onClick={async () => {
+                if (!editProblemId) return;
+                const confirmDelete = confirm(
+                  "정말로 이 문제를 삭제하시겠습니까?",
+                );
+                if (!confirmDelete) return;
+                const { error } = await supabase
+                  .from("problems")
+                  .delete()
+                  .eq("id", editProblemId);
+                if (error) {
+                  toast.error("문제 삭제 중 오류가 발생했습니다.");
+                } else {
+                  toast.success("문제가 삭제되었습니다.");
+                  router.push(
+                    `/organization/${params.organizationId}/problems`,
+                  );
+                  router.refresh();
+                }
+              }}
+              className="bg-red-600 text-white px-6 py-2 rounded-md hover:bg-red-700 transition self-end md:self-auto"
+            >
+              삭제
+            </button>
+          )}
+          <button
+            disabled={loadingExisting}
+            className={
+              "bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition self-end md:self-auto" +
+              (loadingExisting ? " opacity-60 cursor-not-allowed" : "")
             }
-
-            if (!conditions.every((c) => c.trim() !== "")) {
-              toast.error("모든 조건이 비어있지 않아야 합니다.", {
-                position: "top-right",
-                autoClose: 5000,
-                hideProgressBar: false,
-                closeOnClick: false,
-                pauseOnHover: true,
-                draggable: true,
-                progress: undefined,
-                theme: theme === "dark" ? "dark" : "light",
-                transition: Bounce,
-              });
-              return;
-            }
-
-            if (!examplePairs.every((e) => e.output.trim() !== "")) {
-              toast.error("모든 예시 출력이 비어있지 않아야 합니다.", {
-                position: "top-right",
-                autoClose: 5000,
-                hideProgressBar: false,
-                closeOnClick: false,
-                pauseOnHover: true,
-                draggable: true,
-                progress: undefined,
-                theme: theme === "dark" ? "dark" : "light",
-                transition: Bounce,
-              });
-              return;
-            }
-
-            if (!isValidDate(publishedAt)) {
-              toast.error("유효한 날짜 및 시간을 입력하세요.", {
-                position: "top-right",
-                autoClose: 5000,
-                hideProgressBar: false,
-                closeOnClick: false,
-                pauseOnHover: true,
-                draggable: true,
-                progress: undefined,
-                theme: theme === "dark" ? "dark" : "light",
-                transition: Bounce,
-              });
-              return;
-            }
-
-            if (hasDeadline && !isValidDate(deadline)) {
-              toast.error("유효한 마감 기한을 입력하세요.", {
-                position: "top-right",
-                autoClose: 5000,
-                hideProgressBar: false,
-                closeOnClick: false,
-                pauseOnHover: true,
-                draggable: true,
-                progress: undefined,
-                theme: theme === "dark" ? "dark" : "light",
-                transition: Bounce,
-              });
-              return;
-            }
-
-            const payload = {
-              title,
-              description,
-              created_by: user?.id,
-              input_description: inputDescription,
-              output_description: outputDescription,
-              conditions,
-              sample_inputs: examplePairs.map((pair) => pair.input),
-              sample_outputs: examplePairs.map((pair) => pair.output),
-              published_at: new Date(publishedAt).toISOString(),
-              default_code: code,
-              time_limit: timeLimit,
-              memory_limit: memoryLimit,
-              organization_id: parseInt(params.organizationId),
-              deadline: hasDeadline ? new Date(deadline).toISOString() : null,
-              available_languages: availableLanguages,
-              grade: grade || null,
-            };
-
-            if (isEditing && editProblemId) {
-              const { error } = await supabase
-                .from("problems")
-                .update({
-                  ...payload,
-                })
-                .eq("id", editProblemId);
-
-              if (error) {
-                toast.error("수정 중 오류가 발생했습니다.", {
+            onClick={async () => {
+              if (
+                !title ||
+                !description ||
+                !publishedAt ||
+                !inputDescription ||
+                !outputDescription ||
+                availableLanguages.length == 0 ||
+                !grade
+              ) {
+                toast.error("모든 필수 정보를 입력하세요.", {
                   position: "top-right",
-                  autoClose: 3000,
-                  hideProgressBar: true,
-                  closeOnClick: true,
+                  autoClose: 5000,
+                  hideProgressBar: false,
+                  closeOnClick: false,
+                  pauseOnHover: true,
+                  draggable: true,
+                  progress: undefined,
                   theme: theme === "dark" ? "dark" : "light",
                   transition: Bounce,
                 });
-              } else {
-                toast.success("수정이 완료되었습니다.", {
-                  position: "top-right",
-                  autoClose: 1400,
-                  hideProgressBar: true,
-                  closeOnClick: true,
-                  theme: theme === "dark" ? "dark" : "light",
-                  transition: Bounce,
-                });
+                return;
               }
-            } else {
-              const { error } = await supabase.from("problems").insert(payload);
-              if (error) {
-                toast.error("생성 중 오류가 발생했습니다.", {
+
+              if (!conditions.every((c) => c.trim() !== "")) {
+                toast.error("모든 조건이 비어있지 않아야 합니다.", {
                   position: "top-right",
-                  autoClose: 3000,
-                  hideProgressBar: true,
-                  closeOnClick: true,
+                  autoClose: 5000,
+                  hideProgressBar: false,
+                  closeOnClick: false,
+                  pauseOnHover: true,
+                  draggable: true,
+                  progress: undefined,
                   theme: theme === "dark" ? "dark" : "light",
                   transition: Bounce,
                 });
-              } else {
-                toast.success("문제가 생성되었습니다.", {
-                  position: "top-right",
-                  autoClose: 1400,
-                  hideProgressBar: true,
-                  closeOnClick: true,
-                  theme: theme === "dark" ? "dark" : "light",
-                  transition: Bounce,
-                });
-                router.push(`/organization/${params.organizationId}/problems`);
-                router.refresh();
+                return;
               }
-            }
-          }}
-        >
-          {isEditing ? "수정" : "생성"}
-        </button>
+
+              if (!examplePairs.every((e) => e.output.trim() !== "")) {
+                toast.error("모든 예시 출력이 비어있지 않아야 합니다.", {
+                  position: "top-right",
+                  autoClose: 5000,
+                  hideProgressBar: false,
+                  closeOnClick: false,
+                  pauseOnHover: true,
+                  draggable: true,
+                  progress: undefined,
+                  theme: theme === "dark" ? "dark" : "light",
+                  transition: Bounce,
+                });
+                return;
+              }
+
+              if (!isValidDate(publishedAt)) {
+                toast.error("유효한 날짜 및 시간을 입력하세요.", {
+                  position: "top-right",
+                  autoClose: 5000,
+                  hideProgressBar: false,
+                  closeOnClick: false,
+                  pauseOnHover: true,
+                  draggable: true,
+                  progress: undefined,
+                  theme: theme === "dark" ? "dark" : "light",
+                  transition: Bounce,
+                });
+                return;
+              }
+
+              if (hasDeadline && !isValidDate(deadline)) {
+                toast.error("유효한 마감 기한을 입력하세요.", {
+                  position: "top-right",
+                  autoClose: 5000,
+                  hideProgressBar: false,
+                  closeOnClick: false,
+                  pauseOnHover: true,
+                  draggable: true,
+                  progress: undefined,
+                  theme: theme === "dark" ? "dark" : "light",
+                  transition: Bounce,
+                });
+                return;
+              }
+
+              const payload = {
+                title,
+                description,
+                created_by: user?.id,
+                input_description: inputDescription,
+                output_description: outputDescription,
+                conditions,
+                sample_inputs: examplePairs.map((pair) => pair.input),
+                sample_outputs: examplePairs.map((pair) => pair.output),
+                published_at: new Date(publishedAt).toISOString(),
+                default_code: code,
+                time_limit: timeLimit,
+                memory_limit: memoryLimit,
+                organization_id: parseInt(params.organizationId),
+                deadline: hasDeadline ? new Date(deadline).toISOString() : null,
+                available_languages: availableLanguages,
+                grade: grade || null,
+              };
+
+              if (isEditing && editProblemId) {
+                const { error } = await supabase
+                  .from("problems")
+                  .update({
+                    ...payload,
+                  })
+                  .eq("id", editProblemId);
+
+                if (error) {
+                  toast.error("수정 중 오류가 발생했습니다.", {
+                    position: "top-right",
+                    autoClose: 3000,
+                    hideProgressBar: true,
+                    closeOnClick: true,
+                    theme: theme === "dark" ? "dark" : "light",
+                    transition: Bounce,
+                  });
+                } else {
+                  toast.success("수정이 완료되었습니다.", {
+                    position: "top-right",
+                    autoClose: 1400,
+                    hideProgressBar: true,
+                    closeOnClick: true,
+                    theme: theme === "dark" ? "dark" : "light",
+                    transition: Bounce,
+                  });
+                }
+              } else {
+                const { error } = await supabase
+                  .from("problems")
+                  .insert(payload);
+                if (error) {
+                  toast.error("생성 중 오류가 발생했습니다.", {
+                    position: "top-right",
+                    autoClose: 3000,
+                    hideProgressBar: true,
+                    closeOnClick: true,
+                    theme: theme === "dark" ? "dark" : "light",
+                    transition: Bounce,
+                  });
+                } else {
+                  toast.success("문제가 생성되었습니다.", {
+                    position: "top-right",
+                    autoClose: 1400,
+                    hideProgressBar: true,
+                    closeOnClick: true,
+                    theme: theme === "dark" ? "dark" : "light",
+                    transition: Bounce,
+                  });
+                  router.push(
+                    `/organization/${params.organizationId}/problems`,
+                  );
+                  router.refresh();
+                }
+              }
+            }}
+          >
+            {isEditing ? "수정" : "생성"}
+          </button>
+        </div>
       </div>
     </div>
   );
