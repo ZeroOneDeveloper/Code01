@@ -39,6 +39,24 @@ const ProblemPage: React.FC<{
 
   data.creator = creator.data.name;
 
+  const submissions = await supabase
+    .from("problem_submissions")
+    .select("user_id, passed_all")
+    .eq("problem_id", data.id);
+
+  const submission_count = submissions.data?.length ?? 0;
+  const correct_count =
+    submissions.data?.filter((s) => s.passed_all)?.length ?? 0;
+  const user_count = submissions.data
+    ? new Set(
+        submissions.data.filter((s) => s.passed_all).map((s) => s.user_id),
+      ).size
+    : 0;
+  const correct_rate =
+    submission_count === 0
+      ? "0%"
+      : `${Math.floor((correct_count / submission_count) * 100)}%`;
+
   const formatKoreanDate = (iso?: string | null) => {
     if (!iso) return "-";
     try {
@@ -116,12 +134,12 @@ const ProblemPage: React.FC<{
             value:
               data.memory_limit != null ? `${data.memory_limit}MB` : "제한없음",
           },
-          { label: "제출", value: data.submission_count ?? "-" },
-          { label: "정답", value: data.correct_count ?? "-" },
-          { label: "맞힌 사람", value: data.user_count ?? "-" },
+          { label: "제출", value: submission_count || "-" },
+          { label: "정답", value: correct_count || "-" },
+          { label: "맞힌 사람", value: user_count || "-" },
           {
             label: "정답 비율",
-            value: data.correct_rate != null ? `${data.correct_rate}%` : "-",
+            value: correct_rate,
           },
           {
             label: "게시일",
