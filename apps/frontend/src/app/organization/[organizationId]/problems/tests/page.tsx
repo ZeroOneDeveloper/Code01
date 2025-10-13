@@ -132,7 +132,7 @@ export default function ProblemTestsPage() {
       setItems(data ?? []);
     }
     setLoading(false);
-  }, [problemId, page, pageSize, supabase]);
+  }, [problemId, page, pageSize, supabase, theme]);
 
   useEffect(() => {
     load();

@@ -117,6 +117,8 @@ int main(void) {
     number | null
   >(null);
   const [loadingTransfer, setLoadingTransfer] = useState(false);
+  // prevent double submit on create/update
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -246,7 +248,7 @@ int main(void) {
       .eq("organization_id", params.organizationId)
       .single();
 
-    if (memberErr || !member || member.role.toLowerCase() !== "admin") {
+    if (memberErr || !member || member.role !== "ADMIN") {
       setLoadingTransfer(false);
       toast.error("권한이 없습니다.");
       return;
@@ -257,7 +259,7 @@ int main(void) {
       .from("organization_members")
       .select("organization_id")
       .eq("user_id", user.id)
-      .eq("role", "admin");
+      .eq("role", "ADMIN");
 
     if (adminErr || !adminRows) {
       setLoadingTransfer(false);
@@ -715,12 +717,17 @@ int main(void) {
             </>
           )}
           <button
-            disabled={loadingExisting}
+            disabled={loadingExisting || isSubmitting}
             className={
               "bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition self-end md:self-auto" +
-              (loadingExisting ? " opacity-60 cursor-not-allowed" : "")
+              (loadingExisting || isSubmitting
+                ? " opacity-60 cursor-not-allowed"
+                : "")
             }
             onClick={async () => {
+              if (isSubmitting) return; // guard double click
+
+              // --- validations ---
               if (
                 !title ||
                 !description ||
@@ -804,83 +811,114 @@ int main(void) {
                 return;
               }
 
-              const payload = {
-                title,
-                description,
-                created_by: user?.id,
-                input_description: inputDescription,
-                output_description: outputDescription,
-                conditions,
-                sample_inputs: examplePairs.map((pair) => pair.input),
-                sample_outputs: examplePairs.map((pair) => pair.output),
-                published_at: new Date(publishedAt).toISOString(),
-                default_code: code,
-                time_limit: timeLimit,
-                memory_limit: memoryLimit,
-                organization_id: parseInt(params.organizationId),
-                deadline: hasDeadline ? new Date(deadline).toISOString() : null,
-                available_languages: availableLanguages,
-                grade: grade || null,
-              };
+              setIsSubmitting(true);
+              try {
+                const payload = {
+                  title,
+                  description,
+                  created_by: user?.id,
+                  input_description: inputDescription,
+                  output_description: outputDescription,
+                  conditions,
+                  sample_inputs: examplePairs.map((pair) => pair.input),
+                  sample_outputs: examplePairs.map((pair) => pair.output),
+                  published_at: new Date(publishedAt).toISOString(),
+                  default_code: code,
+                  time_limit: timeLimit,
+                  memory_limit: memoryLimit,
+                  organization_id: parseInt(params.organizationId),
+                  deadline: hasDeadline
+                    ? new Date(deadline).toISOString()
+                    : null,
+                  available_languages: availableLanguages,
+                  grade: grade || null,
+                };
 
-              if (isEditing && editProblemId) {
-                const { error } = await supabase
-                  .from("problems")
-                  .update({
-                    ...payload,
-                  })
-                  .eq("id", editProblemId);
+                if (isEditing && editProblemId) {
+                  const { error } = await supabase
+                    .from("problems")
+                    .update({
+                      ...payload,
+                    })
+                    .eq("id", editProblemId);
 
-                if (error) {
-                  toast.error("수정 중 오류가 발생했습니다.", {
-                    position: "top-right",
-                    autoClose: 3000,
-                    hideProgressBar: true,
-                    closeOnClick: true,
-                    theme: theme === "dark" ? "dark" : "light",
-                    transition: Bounce,
-                  });
+                  if (error) {
+                    toast.error("수정 중 오류가 발생했습니다.", {
+                      position: "top-right",
+                      autoClose: 3000,
+                      hideProgressBar: true,
+                      closeOnClick: true,
+                      theme: theme === "dark" ? "dark" : "light",
+                      transition: Bounce,
+                    });
+                  } else {
+                    toast.success("수정이 완료되었습니다.", {
+                      position: "top-right",
+                      autoClose: 1400,
+                      hideProgressBar: true,
+                      closeOnClick: true,
+                      theme: theme === "dark" ? "dark" : "light",
+                      transition: Bounce,
+                    });
+                  }
                 } else {
-                  toast.success("수정이 완료되었습니다.", {
-                    position: "top-right",
-                    autoClose: 1400,
-                    hideProgressBar: true,
-                    closeOnClick: true,
-                    theme: theme === "dark" ? "dark" : "light",
-                    transition: Bounce,
-                  });
+                  const { error } = await supabase
+                    .from("problems")
+                    .insert(payload);
+                  if (error) {
+                    toast.error("생성 중 오류가 발생했습니다.", {
+                      position: "top-right",
+                      autoClose: 3000,
+                      hideProgressBar: true,
+                      closeOnClick: true,
+                      theme: theme === "dark" ? "dark" : "light",
+                      transition: Bounce,
+                    });
+                  } else {
+                    toast.success("문제가 생성되었습니다.", {
+                      position: "top-right",
+                      autoClose: 1400,
+                      hideProgressBar: true,
+                      closeOnClick: true,
+                      theme: theme === "dark" ? "dark" : "light",
+                      transition: Bounce,
+                    });
+                    router.push(
+                      `/organization/${params.organizationId}/problems`,
+                    );
+                    router.refresh();
+                  }
                 }
-              } else {
-                const { error } = await supabase
-                  .from("problems")
-                  .insert(payload);
-                if (error) {
-                  toast.error("생성 중 오류가 발생했습니다.", {
-                    position: "top-right",
-                    autoClose: 3000,
-                    hideProgressBar: true,
-                    closeOnClick: true,
-                    theme: theme === "dark" ? "dark" : "light",
-                    transition: Bounce,
-                  });
-                } else {
-                  toast.success("문제가 생성되었습니다.", {
-                    position: "top-right",
-                    autoClose: 1400,
-                    hideProgressBar: true,
-                    closeOnClick: true,
-                    theme: theme === "dark" ? "dark" : "light",
-                    transition: Bounce,
-                  });
-                  router.push(
-                    `/organization/${params.organizationId}/problems`,
-                  );
-                  router.refresh();
-                }
+              } finally {
+                setIsSubmitting(false);
               }
             }}
           >
-            {isEditing ? "수정" : "생성"}
+            {isSubmitting ? (
+              <span className="inline-flex items-center gap-2">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  className="h-4 w-4 animate-spin"
+                >
+                  <circle
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    strokeWidth="4"
+                    opacity="0.25"
+                  />
+                  <path d="M12 2a10 10 0 0 1 10 10" strokeWidth="4" />
+                </svg>
+                {isEditing ? "수정 중..." : "생성 중..."}
+              </span>
+            ) : isEditing ? (
+              "수정"
+            ) : (
+              "생성"
+            )}
           </button>
         </div>
       </div>
