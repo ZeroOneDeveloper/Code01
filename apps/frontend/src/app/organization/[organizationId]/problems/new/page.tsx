@@ -108,6 +108,16 @@ int main(void) {
   const [editorTheme, setEditorTheme] = useState("light");
   const { theme } = useTheme();
 
+  // --- transfer organization modal state ---
+  const [isTransferOpen, setIsTransferOpen] = useState(false);
+  const [orgOptions, setOrgOptions] = useState<{ id: number; name: string }[]>(
+    [],
+  );
+  const [selectedTransferOrgId, setSelectedTransferOrgId] = useState<
+    number | null
+  >(null);
+  const [loadingTransfer, setLoadingTransfer] = useState(false);
+
   useEffect(() => {
     const fetchUser = async () => {
       const {
@@ -222,6 +232,93 @@ int main(void) {
       setLoadingExisting(false);
     })();
   }, [searchParams, supabase, theme]);
+
+  // --- organization transfer helpers ---
+  const openTransferModal = async () => {
+    if (!user) return toast.error("로그인이 필요합니다.");
+    setLoadingTransfer(true);
+
+    // 권한 확인: 현재 조직에서 ADMIN인지
+    const { data: member, error: memberErr } = await supabase
+      .from("organization_members")
+      .select("role")
+      .eq("user_id", user.id)
+      .eq("organization_id", params.organizationId)
+      .single();
+
+    if (memberErr || !member || member.role.toLowerCase() !== "admin") {
+      setLoadingTransfer(false);
+      toast.error("권한이 없습니다.");
+      return;
+    }
+
+    // 사용자가 ADMIN인 조직 목록 조회
+    const { data: adminRows, error: adminErr } = await supabase
+      .from("organization_members")
+      .select("organization_id")
+      .eq("user_id", user.id)
+      .eq("role", "admin");
+
+    if (adminErr || !adminRows) {
+      setLoadingTransfer(false);
+      toast.error("조직 목록을 불러오지 못했습니다.");
+      return;
+    }
+
+    const currentOrgId = parseInt(params.organizationId);
+    const targetIds = adminRows
+      .map((r: { organization_id: number }) => r.organization_id)
+      .filter(
+        (id: number | null | undefined) =>
+          typeof id === "number" && id !== currentOrgId,
+      );
+
+    if (targetIds.length === 0) {
+      setLoadingTransfer(false);
+      toast.info("이동 가능한 조직이 없습니다.");
+      return;
+    }
+
+    const { data: orgs, error: orgErr } = await supabase
+      .from("organizations")
+      .select("id, name")
+      .in("id", targetIds);
+
+    if (orgErr || !orgs) {
+      setLoadingTransfer(false);
+      toast.error("조직 목록을 불러오지 못했습니다.");
+      return;
+    }
+
+    setOrgOptions(orgs as { id: number; name: string }[]);
+    setSelectedTransferOrgId(
+      (orgs[0] as { id: number; name: string })?.id ?? null,
+    );
+    setIsTransferOpen(true);
+    setLoadingTransfer(false);
+  };
+
+  const handleConfirmTransfer = async () => {
+    if (!editProblemId) return;
+    if (!selectedTransferOrgId) {
+      toast.error("이동할 조직을 선택하세요.");
+      return;
+    }
+
+    const { error: updateErr } = await supabase
+      .from("problems")
+      .update({ organization_id: selectedTransferOrgId })
+      .eq("id", editProblemId);
+
+    if (updateErr) {
+      toast.error("조직 이동에 실패했습니다.");
+    } else {
+      toast.success("조직을 이동했습니다.");
+      setIsTransferOpen(false);
+      router.push(`/organization/${selectedTransferOrgId}/problems`);
+      router.refresh();
+    }
+  };
 
   return (
     <div className="relative min-h-screen flex flex-col justify-between">
@@ -579,31 +676,43 @@ int main(void) {
         </div>
         <div className="flex flex-col gap-2 md:flex-row md:gap-2 md:items-center">
           {isEditing && (
-            <button
-              onClick={async () => {
-                if (!editProblemId) return;
-                const confirmDelete = confirm(
-                  "정말로 이 문제를 삭제하시겠습니까?",
-                );
-                if (!confirmDelete) return;
-                const { error } = await supabase
-                  .from("problems")
-                  .delete()
-                  .eq("id", editProblemId);
-                if (error) {
-                  toast.error("문제 삭제 중 오류가 발생했습니다.");
-                } else {
-                  toast.success("문제가 삭제되었습니다.");
-                  router.push(
-                    `/organization/${params.organizationId}/problems`,
+            <>
+              <button
+                onClick={async () => {
+                  if (!editProblemId) return;
+                  const confirmDelete = confirm(
+                    "정말로 이 문제를 삭제하시겠습니까?",
                   );
-                  router.refresh();
+                  if (!confirmDelete) return;
+                  const { error } = await supabase
+                    .from("problems")
+                    .delete()
+                    .eq("id", editProblemId);
+                  if (error) {
+                    toast.error("문제 삭제 중 오류가 발생했습니다.");
+                  } else {
+                    toast.success("문제가 삭제되었습니다.");
+                    router.push(
+                      `/organization/${params.organizationId}/problems`,
+                    );
+                    router.refresh();
+                  }
+                }}
+                className="bg-red-600 text-white px-6 py-2 rounded-md hover:bg-red-700 transition self-end md:self-auto"
+              >
+                삭제
+              </button>
+              <button
+                onClick={openTransferModal}
+                disabled={loadingTransfer}
+                className={
+                  "bg-yellow-500 text-white px-6 py-2 rounded-md hover:bg-yellow-600 transition self-end md:self-auto" +
+                  (loadingTransfer ? " opacity-60 cursor-not-allowed" : "")
                 }
-              }}
-              className="bg-red-600 text-white px-6 py-2 rounded-md hover:bg-red-700 transition self-end md:self-auto"
-            >
-              삭제
-            </button>
+              >
+                조직 이동
+              </button>
+            </>
           )}
           <button
             disabled={loadingExisting}
@@ -775,6 +884,58 @@ int main(void) {
           </button>
         </div>
       </div>
+      {isTransferOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="w-full max-w-md rounded-lg bg-white dark:bg-gray-900 p-4 shadow-lg border border-gray-200 dark:border-gray-700">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-lg font-semibold text-black dark:text-white">
+                문제 조직 이동
+              </h2>
+              <button
+                type="button"
+                onClick={() => setIsTransferOpen(false)}
+                className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <label className="block text-sm text-gray-700 dark:text-gray-300 mb-2">
+              이동할 조직 선택
+            </label>
+            <select
+              className="w-full p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-black dark:text-white"
+              value={selectedTransferOrgId ?? ""}
+              onChange={(e) =>
+                setSelectedTransferOrgId(
+                  e.target.value ? parseInt(e.target.value) : null,
+                )
+              }
+            >
+              {orgOptions.map((org) => (
+                <option key={org.id} value={org.id}>
+                  {org.name} (#{org.id})
+                </option>
+              ))}
+            </select>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setIsTransferOpen(false)}
+                className="px-4 py-2 rounded-md border border-gray-300 dark:border-gray-600 text-black dark:text-white"
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmTransfer}
+                className="px-4 py-2 rounded-md bg-yellow-500 hover:bg-yellow-600 text-white"
+              >
+                이동
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

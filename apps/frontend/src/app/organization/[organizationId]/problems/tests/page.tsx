@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState, useCallback } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useTheme } from "next-themes";
 
 import axios from "axios";
@@ -36,7 +36,6 @@ function clamp(n: number, lo: number, hi: number) {
 export default function ProblemTestsPage() {
   const supabase = createClient();
 
-  const router = useRouter();
   const params = useSearchParams();
   const problemId = Number(params.get("id") || 0);
 
@@ -78,7 +77,7 @@ export default function ProblemTestsPage() {
     setCreating(false);
     if (error) {
       if (
-        (error as any).code === "23505" ||
+        error.code === "23505" ||
         (error.message ?? "").includes("duplicate")
       ) {
         toast.error("중복된 테스트 케이스가 이미 존재합니다.", {
