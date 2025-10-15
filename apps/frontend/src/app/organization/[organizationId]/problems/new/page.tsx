@@ -190,7 +190,7 @@ int main(void) {
       // Build tag suggestions from all problems in the org
       const freq = new Map<string, number>();
       for (const row of data as Problem[]) {
-        const arr = Array.isArray((row as any).tags) ? (row as any).tags : [];
+        const arr = Array.isArray(row.tags) ? row.tags : [];
         for (const t of arr) {
           if (typeof t !== "string") continue;
           const key = t.trim();
@@ -224,9 +224,7 @@ int main(void) {
         setIsEditing(true);
         setTitle(p.title ?? "");
         setDescription(p.description ?? "");
-        setPublishedAt(
-          p.published_at ? toInputLocal(p.published_at as any) : "",
-        );
+        setPublishedAt(p.published_at ? toInputLocal(p.published_at) : "");
         setInputDescription(p.input_description ?? "");
         setOutputDescription(p.output_description ?? "");
         setSource(typeof p.source === "string" ? p.source : "");
@@ -250,7 +248,7 @@ int main(void) {
           })) as { input: string; output: string }[],
         );
 
-        setCode((p as any).default_code ?? "");
+        setCode(p.default_code ?? "");
         setTimeLimit(
           typeof p.time_limit === "number" ? (p.time_limit as number) : null,
         );
@@ -262,17 +260,15 @@ int main(void) {
 
         const has = !!p.deadline;
         setHasDeadline(has);
-        setDeadline(has && p.deadline ? toInputLocal(p.deadline as any) : "");
+        setDeadline(has && p.deadline ? toInputLocal(p.deadline) : "");
 
         setAvailableLanguages(
           Array.isArray(p.available_languages)
             ? (p.available_languages as ("python" | "java" | "c" | "cpp")[])
             : [],
         );
-        setGrade(((p as any).grade as any) ?? "");
-        setTags(
-          Array.isArray((p as any).tags) ? ((p as any).tags as string[]) : [],
-        );
+        setGrade(p.grade ?? "");
+        setTags(Array.isArray(p.tags) ? (p.tags as string[]) : []);
 
         toast.success("기존 문제를 불러왔어요.", {
           position: "top-right",

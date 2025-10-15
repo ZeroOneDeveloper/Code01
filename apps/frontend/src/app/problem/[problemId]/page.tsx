@@ -267,22 +267,20 @@ const ProblemPage: React.FC<{
             aria-label="문제 태그"
             className="flex flex-wrap gap-2"
           >
-            {((data as any).tags as string[]).map(
-              (tag: string, idx: number) => (
-                <div
-                  role="listitem"
-                  key={`${tag}-${idx}`}
-                  className="inline-flex items-center gap-2 rounded-md border border-gray-700 bg-gray-800/70 px-3 py-1.5 shadow-sm hover:bg-gray-800 transition"
-                  title={tag}
-                >
-                  <TagsIcon
-                    className="w-4 h-4 text-gray-300"
-                    aria-hidden="true"
-                  />
-                  <span className="text-sm text-gray-100">{tag}</span>
-                </div>
-              ),
-            )}
+            {(data.tags as string[]).map((tag: string, idx: number) => (
+              <div
+                role="listitem"
+                key={`${tag}-${idx}`}
+                className="inline-flex items-center gap-2 rounded-md border border-gray-700 bg-gray-800/70 px-3 py-1.5 shadow-sm hover:bg-gray-800 transition"
+                title={tag}
+              >
+                <TagsIcon
+                  className="w-4 h-4 text-gray-300"
+                  aria-hidden="true"
+                />
+                <span className="text-sm text-gray-100">{tag}</span>
+              </div>
+            ))}
           </div>
         </div>
       )}
