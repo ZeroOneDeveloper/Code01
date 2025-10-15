@@ -122,6 +122,11 @@ int main(void) {
   const conditionsRef = useRef<HTMLInputElement>(null);
   const examplesRef = useRef<HTMLTextAreaElement>(null);
   const deadlineRef = useRef<HTMLInputElement>(null);
+  // track focused condition input & refs for caret insertion
+  const conditionRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const [activeConditionIndex, setActiveConditionIndex] = useState<
+    number | null
+  >(null);
   const scrollIntoCenterAndFocus = (el: HTMLElement | null | undefined) => {
     if (!el) return;
     el.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -669,11 +674,46 @@ int main(void) {
                 key={idx}
                 type="button"
                 onClick={() => {
+                  // pick active condition index or fallback to the last one
+                  const fallbackIdx = Math.max(0, conditions.length - 1);
+                  const idxToUse =
+                    activeConditionIndex !== null &&
+                    activeConditionIndex >= 0 &&
+                    activeConditionIndex < conditions.length
+                      ? activeConditionIndex
+                      : fallbackIdx;
+
+                  const el = conditionRefs.current[idxToUse];
+                  const currentValue =
+                    typeof el?.value === "string"
+                      ? el.value
+                      : (conditions[idxToUse] ?? "");
+
+                  const start = el?.selectionStart ?? currentValue.length;
+                  const end = el?.selectionEnd ?? currentValue.length;
+
+                  const nextValue =
+                    currentValue.slice(0, start) +
+                    symbol +
+                    currentValue.slice(end);
+
                   setConditions((prev) => {
                     const updated = [...prev];
-                    updated[updated.length - 1] += symbol;
+                    updated[idxToUse] = nextValue;
                     return updated;
                   });
+
+                  // restore focus & caret after state update
+                  setTimeout(() => {
+                    const target = conditionRefs.current[idxToUse];
+                    if (target) {
+                      const pos = start + symbol.length;
+                      target.focus();
+                      try {
+                        target.setSelectionRange(pos, pos);
+                      } catch {}
+                    }
+                  }, 0);
                 }}
                 className="px-3 py-1 bg-gray-200 dark:bg-gray-700 text-black dark:text-white rounded hover:bg-gray-300 dark:hover:bg-gray-600 transition text-sm"
               >
@@ -692,7 +732,14 @@ int main(void) {
                 className="flex gap-2 items-center"
               >
                 <input
-                  ref={index === 0 ? conditionsRef : null}
+                  ref={(el) => {
+                    if (index === 0) conditionsRef.current = el;
+                    conditionRefs.current[index] = el;
+                  }}
+                  onFocus={() => setActiveConditionIndex(index)}
+                  onClick={() => setActiveConditionIndex(index)}
+                  onKeyUp={() => setActiveConditionIndex(index)}
+                  onSelect={() => setActiveConditionIndex(index)}
                   type="text"
                   value={condition}
                   onChange={(e) => {
@@ -721,7 +768,20 @@ int main(void) {
                       });
                       return;
                     }
-                    setConditions(conditions.filter((_, i) => i !== index));
+                    setConditions((prev) => {
+                      const next = prev.filter((_, i) => i !== index);
+                      // adjust active index if needed
+                      setActiveConditionIndex((cur) => {
+                        if (cur === null) return cur;
+                        if (cur === index)
+                          return Math.min(index, next.length - 1);
+                        if (cur > index) return cur - 1;
+                        return cur;
+                      });
+                      // also clean up the ref slot
+                      conditionRefs.current.splice(index, 1);
+                      return next;
+                    });
                   }}
                   className="p-1 bg-red-500 hover:bg-red-600 text-white rounded transition"
                 >
