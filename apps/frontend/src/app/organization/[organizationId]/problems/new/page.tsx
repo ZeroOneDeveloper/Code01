@@ -4,7 +4,7 @@ import React, { JSX, useEffect, useState } from "react";
 import { useTheme } from "next-themes";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 
-import { X, CalendarClock } from "lucide-react";
+import { X, CalendarClock, Tags } from "lucide-react";
 import Editor from "@monaco-editor/react";
 import { User } from "@supabase/auth-js";
 import { motion, AnimatePresence } from "framer-motion";
@@ -14,7 +14,7 @@ import { SiC, SiCplusplus, SiPython } from "react-icons/si";
 import { PiStarFourFill } from "react-icons/pi"; // expert
 import { BsGraphUpArrow, BsGraphDownArrow, BsEmojiSmile } from "react-icons/bs"; // intermediate
 
-import type { Language } from "@lib/types";
+import type { Language, Problem } from "@lib/types";
 import { createClient } from "@lib/supabase/client";
 
 const ALL_LANGUAGES: { value: Language; label: string; icon: JSX.Element }[] = [
@@ -101,6 +101,9 @@ int main(void) {
   const [outputDescription, setOutputDescription] = useState("");
   const [conditions, setConditions] = useState<string[]>([""]);
   const [examplePairs, setExamplePairs] = useState([{ input: "", output: "" }]);
+  // 태그
+  const [tags, setTags] = useState<string[]>([]);
+  const [tagInput, setTagInput] = useState("");
 
   const [hasDeadline, setHasDeadline] = useState(false);
   const [deadline, setDeadline] = useState("");
@@ -150,90 +153,139 @@ int main(void) {
   }, [theme]);
 
   useEffect(() => {
-    const idStr = searchParams.get("id");
-    if (!idStr) return;
-    const idNum = Number(idStr);
-    if (Number.isNaN(idNum)) return;
+    const run = async () => {
+      const orgId = parseInt(params.organizationId);
+      if (Number.isNaN(orgId)) return;
 
-    setLoadingExisting(true);
-    setEditProblemId(idNum);
+      const idStr = searchParams.get("id");
+      const idNum = idStr ? Number(idStr) : null;
+      if (idNum && !Number.isNaN(idNum)) {
+        setLoadingExisting(true);
+        setEditProblemId(idNum);
+      }
 
-    (async () => {
       const { data, error } = await supabase
         .from("problems")
-        .select(
-          "id, title, description, published_at, created_by, input_description, output_description, conditions, sample_inputs, sample_outputs, default_code, time_limit, memory_limit, organization_id, deadline, available_languages, grade",
-        )
-        .eq("id", idNum)
-        .single();
+        .select("*")
+        .eq("organization_id", orgId);
 
       if (error || !data) {
-        toast.error("문제를 불러오지 못했습니다.", {
-          position: "top-right",
-          autoClose: 3000,
-          hideProgressBar: true,
-          closeOnClick: true,
-          pauseOnHover: true,
-          draggable: true,
-          theme: theme === "dark" ? "dark" : "light",
-          transition: Bounce,
-        });
+        if (idNum) {
+          toast.error("문제를 불러오지 못했습니다.", {
+            position: "top-right",
+            autoClose: 3000,
+            hideProgressBar: true,
+            closeOnClick: true,
+            pauseOnHover: true,
+            draggable: true,
+            theme: theme === "dark" ? "dark" : "light",
+            transition: Bounce,
+          });
+        }
         setLoadingExisting(false);
         return;
       }
 
-      setIsEditing(true);
-      setTitle(data.title ?? "");
-      setDescription(data.description ?? "");
-      setPublishedAt(data.published_at ? toInputLocal(data.published_at) : "");
-      setInputDescription(data.input_description ?? "");
-      setOutputDescription(data.output_description ?? "");
-      setConditions(
-        Array.isArray(data.conditions) && data.conditions.length
-          ? data.conditions
-          : [""],
-      );
+      // Build tag suggestions from all problems in the org
+      const freq = new Map<string, number>();
+      for (const row of data as Problem[]) {
+        const arr = Array.isArray((row as any).tags) ? (row as any).tags : [];
+        for (const t of arr) {
+          if (typeof t !== "string") continue;
+          const key = t.trim();
+          if (!key) continue;
+          freq.set(key, (freq.get(key) || 0) + 1);
+        }
+      }
+      const sorted = Array.from(freq.entries())
+        .sort((a, b) => b[1] - a[1])
+        .map(([k]) => k);
+      setTagSuggestions(sorted);
 
-      const si = Array.isArray(data.sample_inputs) ? data.sample_inputs : [];
-      const so = Array.isArray(data.sample_outputs) ? data.sample_outputs : [];
-      const maxLen = Math.max(si.length, so.length);
-      setExamplePairs(
-        (maxLen ? Array.from({ length: maxLen }) : [{}]).map((_, i) => ({
-          input: si[i] ?? "",
-          output: so[i] ?? "",
-        })) as { input: string; output: string }[],
-      );
+      // If editing, hydrate fields from the same dataset
+      if (idNum && !Number.isNaN(idNum)) {
+        const p = (data as Problem[]).find((row) => row.id === idNum);
+        if (!p) {
+          toast.error("문제를 불러오지 못했습니다.", {
+            position: "top-right",
+            autoClose: 3000,
+            hideProgressBar: true,
+            closeOnClick: true,
+            pauseOnHover: true,
+            draggable: true,
+            theme: theme === "dark" ? "dark" : "light",
+            transition: Bounce,
+          });
+          setLoadingExisting(false);
+          return;
+        }
 
-      setCode(data.default_code ?? "");
-      setTimeLimit(
-        typeof data.time_limit === "number" ? data.time_limit : null,
-      );
-      setMemoryLimit(
-        typeof data.memory_limit === "number" ? data.memory_limit : null,
-      );
+        setIsEditing(true);
+        setTitle(p.title ?? "");
+        setDescription(p.description ?? "");
+        setPublishedAt(
+          p.published_at ? toInputLocal(p.published_at as any) : "",
+        );
+        setInputDescription(p.input_description ?? "");
+        setOutputDescription(p.output_description ?? "");
+        setConditions(
+          Array.isArray(p.conditions) && p.conditions.length
+            ? (p.conditions as string[])
+            : [""],
+        );
 
-      const has = !!data.deadline;
-      setHasDeadline(has);
-      setDeadline(has && data.deadline ? toInputLocal(data.deadline) : "");
+        const si = Array.isArray(p.sample_inputs)
+          ? (p.sample_inputs as string[])
+          : [];
+        const so = Array.isArray(p.sample_outputs)
+          ? (p.sample_outputs as string[])
+          : [];
+        const maxLen = Math.max(si.length, so.length);
+        setExamplePairs(
+          (maxLen ? Array.from({ length: maxLen }) : [{}]).map((_, i) => ({
+            input: si[i] ?? "",
+            output: so[i] ?? "",
+          })) as { input: string; output: string }[],
+        );
 
-      // Set availableLanguages and grade if present
-      setAvailableLanguages(
-        Array.isArray(data.available_languages) ? data.available_languages : [],
-      );
-      setGrade(data.grade ?? "");
+        setCode((p as any).default_code ?? "");
+        setTimeLimit(
+          typeof p.time_limit === "number" ? (p.time_limit as number) : null,
+        );
+        setMemoryLimit(
+          typeof p.memory_limit === "number"
+            ? (p.memory_limit as number)
+            : null,
+        );
 
-      toast.success("기존 문제를 불러왔어요.", {
-        position: "top-right",
-        autoClose: 1400,
-        hideProgressBar: true,
-        closeOnClick: true,
-        theme: theme === "dark" ? "dark" : "light",
-        transition: Bounce,
-      });
+        const has = !!p.deadline;
+        setHasDeadline(has);
+        setDeadline(has && p.deadline ? toInputLocal(p.deadline as any) : "");
+
+        setAvailableLanguages(
+          Array.isArray(p.available_languages)
+            ? (p.available_languages as ("python" | "java" | "c" | "cpp")[])
+            : [],
+        );
+        setGrade(((p as any).grade as any) ?? "");
+        setTags(
+          Array.isArray((p as any).tags) ? ((p as any).tags as string[]) : [],
+        );
+
+        toast.success("기존 문제를 불러왔어요.", {
+          position: "top-right",
+          autoClose: 1400,
+          hideProgressBar: true,
+          closeOnClick: true,
+          theme: theme === "dark" ? "dark" : "light",
+          transition: Bounce,
+        });
+      }
 
       setLoadingExisting(false);
-    })();
-  }, [searchParams, supabase, theme]);
+    };
+    run();
+  }, [supabase, params.organizationId, searchParams, theme]);
 
   // --- organization transfer helpers ---
   const openTransferModal = async () => {
@@ -320,6 +372,17 @@ int main(void) {
       router.push(`/organization/${selectedTransferOrgId}/problems`);
       router.refresh();
     }
+  };
+
+  // --- helpers for tags ---
+  const [tagSuggestions, setTagSuggestions] = useState<string[]>([]);
+  const normalizeTag = (s: string) => s.trim();
+
+  const handleAddTag = () => {
+    const t = normalizeTag(tagInput);
+    if (!t) return;
+    setTags((prev) => Array.from(new Set([...prev, t])));
+    setTagInput("");
   };
 
   return (
@@ -484,6 +547,59 @@ int main(void) {
             value={outputDescription}
             onChange={(e) => setOutputDescription(e.target.value)}
           />
+        </div>
+        <div className="flex flex-col gap-4">
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            <Tags className="w-6 h-6" /> 태그 (선택)
+          </h1>
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={tagInput}
+              onChange={(e) => setTagInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === ",") {
+                  e.preventDefault();
+                  handleAddTag();
+                }
+              }}
+              className="flex-grow p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-black dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200"
+              list="tags-datalist"
+              placeholder="예: 그래프, 탐색, 너비 우선 탐색"
+            />
+            <button
+              type="button"
+              onClick={handleAddTag}
+              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            >
+              추가
+            </button>
+          </div>
+          <datalist id="tags-datalist">
+            {tagSuggestions.map((t) => (
+              <option key={t} value={t} />
+            ))}
+          </datalist>
+          <div className="flex gap-2 flex-wrap">
+            {tags.map((t, idx) => (
+              <span
+                key={`${t}-${idx}`}
+                className="inline-flex items-center gap-1 px-2 py-1 rounded bg-gray-200 dark:bg-gray-700 text-black dark:text-white"
+              >
+                <span className="text-sm">{t}</span>
+                <button
+                  type="button"
+                  onClick={() => setTags(tags.filter((_, i) => i !== idx))}
+                  className="rounded p-0.5 hover:bg-gray-300 dark:hover:bg-gray-600"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </span>
+            ))}
+          </div>
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            입력한 태그를 그대로 저장합니다. 한국어/영문 모두 입력 가능해요.
+          </p>
         </div>
         <div className="flex flex-col gap-4">
           <h1 className="text-2xl font-bold">예시 입/출력</h1>
@@ -832,6 +948,7 @@ int main(void) {
                     : null,
                   available_languages: availableLanguages,
                   grade: grade || null,
+                  tags: tags,
                 };
 
                 if (isEditing && editProblemId) {

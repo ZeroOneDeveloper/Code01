@@ -55,10 +55,11 @@ export interface Problem {
   time_limit: number;
   memory_limit: number;
   organization_id: number;
-  deadline?: string | null;
+  deadline: string | null;
   grade: "expert" | "advanced" | "intermediate" | "beginner";
   available_languages: Language[];
-  source?: string;
+  source: string | null;
+  tags: string[] | null;
 }
 
 export interface TestCase {

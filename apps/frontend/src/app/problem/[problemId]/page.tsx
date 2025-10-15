@@ -2,6 +2,7 @@ import React from "react";
 
 import CopyButton from "@components/CopyButton";
 import { createClient } from "@lib/supabase/server";
+import { Tags as TagsIcon } from "lucide-react";
 
 const isNumeric = (value: string) => /^\d+$/.test(value);
 
@@ -256,6 +257,35 @@ const ProblemPage: React.FC<{
           )}
         </ul>
       </div>
+      {Array.isArray(data.tags) && data.tags.length > 0 && (
+        <div className="flex flex-col gap-4">
+          <h2 className="text-2xl font-semibold border-b-2 border-primary w-fit">
+            태그
+          </h2>
+          <div
+            role="list"
+            aria-label="문제 태그"
+            className="flex flex-wrap gap-2"
+          >
+            {((data as any).tags as string[]).map(
+              (tag: string, idx: number) => (
+                <div
+                  role="listitem"
+                  key={`${tag}-${idx}`}
+                  className="inline-flex items-center gap-2 rounded-md border border-gray-700 bg-gray-800/70 px-3 py-1.5 shadow-sm hover:bg-gray-800 transition"
+                  title={tag}
+                >
+                  <TagsIcon
+                    className="w-4 h-4 text-gray-300"
+                    aria-hidden="true"
+                  />
+                  <span className="text-sm text-gray-100">{tag}</span>
+                </div>
+              ),
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
