@@ -392,7 +392,9 @@ int main(void) {
           </div>
         )}
         <div className="flex flex-col gap-4">
-          <h1 className="text-2xl font-bold">제목</h1>
+          <h1 className="text-2xl font-bold flex items-center gap-1">
+            제목 <span className="text-red-500">*</span>
+          </h1>
           <input
             type="text"
             className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-black dark:text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200"
@@ -402,7 +404,9 @@ int main(void) {
           />
         </div>
         <div className="flex flex-col gap-4">
-          <h1 className="text-2xl font-bold">문제 설명</h1>
+          <h1 className="text-2xl font-bold flex items-center gap-1">
+            문제 설명 <span className="text-red-500">*</span>
+          </h1>
           <textarea
             className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-black dark:text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200 resize-none min-h-[150px]"
             placeholder="문제에 대한 설명을 입력하세요"
@@ -411,7 +415,9 @@ int main(void) {
           />
         </div>
         <div className="flex flex-col gap-4">
-          <h1 className="text-2xl font-bold">공개 날짜 및 시간</h1>
+          <h1 className="text-2xl font-bold flex items-center gap-1">
+            공개 날짜 및 시간 <span className="text-red-500">*</span>
+          </h1>
           <input
             type="datetime-local"
             className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-black dark:text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200"
@@ -422,7 +428,7 @@ int main(void) {
         <div className="flex flex-col gap-4">
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <CalendarClock className="w-6 h-6" />
-            마감 기한 (선택)
+            마감 기한
           </h1>
           <div className="flex items-center gap-3">
             <label className="inline-flex items-center gap-2 select-none">
@@ -454,7 +460,9 @@ int main(void) {
           </AnimatePresence>
         </div>
         <div className="flex flex-col gap-4">
-          <h1 className="text-2xl font-bold">조건</h1>
+          <h1 className="text-2xl font-bold flex items-center gap-1">
+            조건 <span className="text-red-500">*</span>
+          </h1>
           <div className="flex gap-2 flex-wrap">
             {[">", "<", "≥", "≤"].map((symbol, idx) => (
               <button
@@ -529,7 +537,9 @@ int main(void) {
           </button>
         </div>
         <div className="flex flex-col gap-4">
-          <h1 className="text-2xl font-bold">입력 설명</h1>
+          <h1 className="text-2xl font-bold flex items-center gap-1">
+            입력 설명 <span className="text-red-500">*</span>
+          </h1>
           <textarea
             className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-black dark:text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200 resize-none min-h-[150px]"
             placeholder="입력 형식에 대한 설명을 입력하세요"
@@ -538,7 +548,9 @@ int main(void) {
           />
         </div>
         <div className="flex flex-col gap-4">
-          <h1 className="text-2xl font-bold">출력 설명</h1>
+          <h1 className="text-2xl font-bold flex items-center gap-1">
+            출력 설명 <span className="text-red-500">*</span>
+          </h1>
           <textarea
             className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-black dark:text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200 resize-none min-h-[150px]"
             placeholder="출력 형식에 대한 설명을 입력하세요"
@@ -547,7 +559,7 @@ int main(void) {
           />
         </div>
         <div className="flex flex-col gap-4">
-          <h1 className="text-2xl font-bold">출처 (선택)</h1>
+          <h1 className="text-2xl font-bold">출처</h1>
           <input
             type="text"
             className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-black dark:text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200"
@@ -561,7 +573,7 @@ int main(void) {
         </div>
         <div className="flex flex-col gap-4">
           <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Tags className="w-6 h-6" /> 태그 (선택)
+            <Tags className="w-6 h-6" /> 태그
           </h1>
           <div className="flex items-center gap-2">
             <input
@@ -613,7 +625,9 @@ int main(void) {
           </p>
         </div>
         <div className="flex flex-col gap-4">
-          <h1 className="text-2xl font-bold">예시 입/출력</h1>
+          <h1 className="text-2xl font-bold flex items-center gap-1">
+            예시 입/출력 <span className="text-red-500">*</span>
+          </h1>
           <AnimatePresence>
             {examplePairs.map((pair, index) => (
               <motion.div
@@ -688,7 +702,9 @@ int main(void) {
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 px-6 pb-6">
         <div className="flex flex-col gap-4 px-6">
-          <h1 className="text-2xl font-bold">제출 가능 언어</h1>
+          <h1 className="text-2xl font-bold flex items-center gap-1">
+            제출 가능 언어 <span className="text-red-500">*</span>
+          </h1>
           <div className="flex gap-2 flex-wrap">
             {ALL_LANGUAGES.map(({ value, label, icon }) => {
               const isSelected = availableLanguages.includes(value);
@@ -718,7 +734,9 @@ int main(void) {
         </div>
 
         <div className="flex flex-col gap-4 px-6">
-          <h1 className="text-2xl font-bold">난이도</h1>
+          <h1 className="text-2xl font-bold flex items-center gap-1">
+            난이도 <span className="text-red-500">*</span>
+          </h1>
           <div className="flex gap-2 flex-wrap">
             {(["expert", "advanced", "intermediate", "beginner"] as const).map(
               (level) => {
