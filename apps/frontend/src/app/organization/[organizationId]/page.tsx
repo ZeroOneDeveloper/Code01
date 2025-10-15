@@ -6,10 +6,10 @@ import { useTheme } from "next-themes";
 
 import { Bounce, toast } from "react-toastify";
 import { User as UserType } from "@supabase/auth-js";
-import { Check, ShieldUser, User, UserMinus } from "lucide-react";
+import { ShieldUser, User, UserMinus, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
-import { Organization, UserProfile } from "@lib/types";
+import { Organization } from "@lib/types";
 import { createClient } from "@lib/supabase/client";
 
 const OrganizationManagementPage: React.FC = () => {
@@ -31,22 +31,6 @@ const OrganizationManagementPage: React.FC = () => {
       joinedAt: string;
     }[]
   >([]);
-  const [users, setUsers] = useState<Array<UserProfile>>([]);
-  const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(
-    new Set(),
-  );
-
-  const toggleUserSelection = (userId: string) => {
-    setSelectedUserIds((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(userId)) {
-        newSet.delete(userId);
-      } else {
-        newSet.add(userId);
-      }
-      return newSet;
-    });
-  };
 
   const fetchMembers = useCallback(async () => {
     const { data: membersData, error } = await supabase
@@ -140,33 +124,164 @@ const OrganizationManagementPage: React.FC = () => {
     fetchMembers();
   }, [fetchMembers]);
 
-  useEffect(() => {
-    const fetchUsers = async () => {
-      const { data: usersData, error } = await supabase
-        .from("users")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      if (error) {
-        console.error("Error fetching users:", error);
-      } else {
-        const memberIds = new Set(members.map((m) => m.id));
-        const nonMemberUsers = (usersData || []).filter(
-          (u) => !memberIds.has(u.id),
-        );
-        setUsers(nonMemberUsers);
-      }
-    };
-
-    fetchUsers();
-  }, [supabase, members]);
-
   const [modal, setModal] = useState<{
     type: "role" | "remove";
     userId: string;
     currentRole?: "admin" | "member";
   } | null>(null);
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
+  const [inviteValue, setInviteValue] = useState("");
+  const [isInviting, setIsInviting] = useState(false);
+  const [inviteQueue, setInviteQueue] = useState<string[]>([]);
+  const [inviteResults, setInviteResults] = useState<{
+    success: string[];
+    already: string[];
+    notFound: string[];
+  } | null>(null);
+  const addInviteToken = useCallback(() => {
+    const v = inviteValue.trim();
+    if (!v) return;
+    setInviteQueue((prev) => {
+      const normalizedPrev = prev.map((t) =>
+        t.includes("@") ? t.toLowerCase() : t,
+      );
+      const norm = v.includes("@") ? v.toLowerCase() : v;
+      if (normalizedPrev.includes(norm)) return prev; // dedupe
+      return [...prev, v];
+    });
+    setInviteValue("");
+  }, [inviteValue]);
+
+  const removeInviteToken = useCallback((idx: number) => {
+    setInviteQueue((prev) => prev.filter((_, i) => i !== idx));
+  }, []);
+
+  const handleInvite = useCallback(async () => {
+    const tokens = Array.from(
+      new Set(inviteQueue.map((t) => t.trim()).filter(Boolean)),
+    );
+    if (tokens.length === 0) return;
+    setIsInviting(true);
+    try {
+      // 2) split by heuristic: with '@' => email, otherwise student_id
+      const emailTokens = tokens.filter((t) => t.includes("@"));
+      const sidTokens = tokens.filter((t) => !t.includes("@"));
+
+      type Candidate = {
+        id: string;
+        email: string | null;
+        student_id: string | null;
+      };
+      let candidates: Candidate[] = [];
+
+      if (emailTokens.length) {
+        const { data } = await supabase
+          .from("users")
+          .select("id, email, student_id")
+          .in("email", emailTokens);
+        if (Array.isArray(data))
+          candidates = candidates.concat(data as Candidate[]);
+      }
+      if (sidTokens.length) {
+        const { data } = await supabase
+          .from("users")
+          .select("id, email, student_id")
+          .in("student_id", sidTokens);
+        if (Array.isArray(data))
+          candidates = candidates.concat(data as Candidate[]);
+      }
+
+      // 3) build lookup maps for quick resolution
+      const byEmail = new Map<string, string>();
+      const bySid = new Map<string, string>();
+      for (const c of candidates) {
+        if (c.email) byEmail.set(c.email.toLowerCase(), c.id);
+        if (c.student_id) bySid.set(String(c.student_id), c.id);
+      }
+
+      const tokenToUserId = new Map<string, string>();
+      for (const t of tokens) {
+        const id = t.includes("@")
+          ? byEmail.get(t.toLowerCase())
+          : bySid.get(t);
+        if (id) tokenToUserId.set(t, id);
+      }
+
+      const notFound = tokens.filter((t) => !tokenToUserId.has(t));
+
+      const matchedIds = Array.from(
+        new Set(Array.from(tokenToUserId.values())),
+      );
+
+      // 4) filter out already members
+      let alreadyIdSet = new Set<string>();
+      if (matchedIds.length) {
+        const { data: existing } = await supabase
+          .from("organization_members")
+          .select("user_id")
+          .eq("organization_id", organizationId)
+          .in("user_id", matchedIds);
+        if (Array.isArray(existing)) {
+          alreadyIdSet = new Set(
+            existing.map((r) => String((r as { user_id: string }).user_id)),
+          );
+        }
+      }
+
+      const toInsertIds = matchedIds.filter((id) => !alreadyIdSet.has(id));
+      if (toInsertIds.length) {
+        const rows = toInsertIds.map((id) => ({
+          organization_id: organizationId,
+          user_id: id,
+          role: "member",
+        }));
+        const { error: insertErr } = await supabase
+          .from("organization_members")
+          .insert(rows);
+        if (insertErr) {
+          console.error(insertErr);
+          toast.error("일부 초대에 실패했습니다.", {
+            position: "top-right",
+            autoClose: 3000,
+            hideProgressBar: true,
+            closeOnClick: true,
+            theme: theme === "dark" ? "dark" : "light",
+            transition: Bounce,
+          });
+        }
+      }
+
+      // 5) build feedback lists based on original tokens
+      const successTokens = tokens.filter((t) => {
+        const id = tokenToUserId.get(t);
+        return id ? toInsertIds.includes(id) : false;
+      });
+      const alreadyTokens = tokens.filter((t) => {
+        const id = tokenToUserId.get(t);
+        return id ? alreadyIdSet.has(id) : false;
+      });
+
+      setInviteResults({
+        success: successTokens,
+        already: alreadyTokens,
+        notFound,
+      });
+
+      toast.success(`초대 완료: ${successTokens.length}명`, {
+        position: "top-right",
+        autoClose: 1800,
+        hideProgressBar: true,
+        closeOnClick: true,
+        theme: theme === "dark" ? "dark" : "light",
+        transition: Bounce,
+      });
+
+      // refresh members list
+      await fetchMembers();
+    } finally {
+      setIsInviting(false);
+    }
+  }, [inviteQueue, supabase, organizationId, theme, fetchMembers]);
 
   const handleConfirm = useCallback(async () => {
     if (!modal) return;
@@ -333,7 +448,7 @@ const OrganizationManagementPage: React.FC = () => {
             className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors hover:cursor-pointer"
             onClick={() => setInviteModalOpen(true)}
           >
-            초대
+            추가
           </button>
         </div>
       </div>
@@ -400,95 +515,148 @@ const OrganizationManagementPage: React.FC = () => {
               <h2 className="text-lg font-semibold mb-4 text-center text-gray-800 dark:text-gray-200">
                 유저 초대
               </h2>
-              <table className="w-full table-auto border-collapse text-sm text-center">
-                <thead>
-                  <tr className="border-b">
-                    <th className="p-2">이름</th>
-                    <th className="p-2">학번</th>
-                    <th className="p-2">이메일</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {users.map((user) => (
-                    <tr
-                      key={user.id}
-                      onClick={() => toggleUserSelection(user.id)}
-                      className={`border-b cursor-pointer transition-colors ${
-                        selectedUserIds.has(user.id)
-                          ? "bg-blue-100 dark:bg-blue-800"
-                          : "hover:bg-gray-100 dark:hover:bg-gray-700"
-                      }`}
-                    >
-                      <td className="p-2 flex items-center justify-center gap-2">
-                        <div className="relative w-4 h-4">
-                          <AnimatePresence>
-                            {selectedUserIds.has(user.id) && (
-                              <motion.div
-                                key="check"
-                                initial={{ scale: 0, opacity: 0 }}
-                                animate={{ scale: 1, opacity: 1 }}
-                                exit={{ scale: 0, opacity: 0 }}
-                                transition={{
-                                  type: "spring",
-                                  stiffness: 500,
-                                  damping: 30,
-                                }}
-                                className="absolute"
-                              >
-                                <Check className="w-4 h-4 text-blue-600 dark:text-blue-300" />
-                              </motion.div>
-                            )}
-                          </AnimatePresence>
-                        </div>
-                        <span>{user.name || "─"}</span>
-                      </td>
-                      <td className="p-2">{user.student_id || "─"}</td>
-                      <td className="p-2">{user.email}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              <div className="mt-6 flex justify-end gap-2">
-                {selectedUserIds.size > 0 && (
-                  <button
-                    onClick={async () => {
-                      for (const userId of selectedUserIds) {
-                        await supabase.from("organization_members").insert({
-                          organization_id: organizationId,
-                          user_id: userId,
-                          role: "member",
-                        });
+              <div className="space-y-2">
+                <label className="text-sm text-gray-600 dark:text-gray-300">
+                  이메일 또는 학번
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={inviteValue}
+                    onChange={(e) => setInviteValue(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        addInviteToken();
                       }
-                      toast.success(
-                        `선택한 ${selectedUserIds.size}명을 유저를 초대했습니다.`,
-                        {
-                          position: "top-right",
-                          autoClose: 5000,
-                          hideProgressBar: false,
-                          closeOnClick: false,
-                          pauseOnHover: true,
-                          draggable: true,
-                          progress: undefined,
-                          theme: theme === "dark" ? "dark" : "light",
-                          transition: Bounce,
-                        },
-                      );
-                      setInviteModalOpen(false);
-                      setSelectedUserIds(new Set());
-                      fetchMembers();
                     }}
+                    placeholder="예: user@example.com 또는 20231234"
+                    className="flex-1 p-3 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-black dark:text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={addInviteToken}
                     className="px-4 py-2 rounded bg-blue-500 text-white hover:bg-blue-600"
-                    disabled={selectedUserIds.size === 0}
                   >
-                    초대
+                    추가
                   </button>
+                </div>
+                {inviteQueue.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {inviteQueue.map((t, idx) => (
+                      <span
+                        key={`${t}-${idx}`}
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded bg-gray-200 dark:bg-gray-700 text-black dark:text-white text-sm"
+                      >
+                        <span className="truncate max-w-[200px]" title={t}>
+                          {t}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => removeInviteToken(idx)}
+                          className="p-0.5 rounded hover:bg-gray-300 dark:hover:bg-gray-600"
+                          aria-label="remove"
+                          title="삭제"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
                 )}
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  한 명씩 추가 버튼으로 리스트에 담아 초대할 수 있어요.
+                </p>
+              </div>
+
+              {inviteResults && (
+                <div className="mt-4 space-y-3">
+                  {inviteResults.success.length > 0 && (
+                    <div className="rounded-md border border-green-400/40 bg-green-50 dark:bg-green-900/20 p-3">
+                      <p className="text-sm font-medium text-green-700 dark:text-green-300">
+                        초대 성공 ({inviteResults.success.length})
+                      </p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {inviteResults.success.map((t) => (
+                          <span
+                            key={`s-${t}`}
+                            className="px-2 py-1 text-xs rounded bg-green-100 dark:bg-green-800 text-green-800 dark:text-green-200"
+                          >
+                            {t}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {inviteResults.already.length > 0 && (
+                    <div className="rounded-md border border-blue-400/40 bg-blue-50 dark:bg-blue-900/20 p-3">
+                      <p className="text-sm font-medium text-blue-700 dark:text-blue-300">
+                        이미 멤버 ({inviteResults.already.length})
+                      </p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {inviteResults.already.map((t) => (
+                          <span
+                            key={`a-${t}`}
+                            className="px-2 py-1 text-xs rounded bg-blue-100 dark:bg-blue-800 text-blue-800 dark:text-blue-200"
+                          >
+                            {t}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {inviteResults.notFound.length > 0 && (
+                    <div className="rounded-md border border-red-400/40 bg-red-50 dark:bg-red-900/20 p-3">
+                      <p className="text-sm font-medium text-red-700 dark:text-red-300">
+                        찾을 수 없음 ({inviteResults.notFound.length})
+                      </p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {inviteResults.notFound.map((t) => (
+                          <span
+                            key={`n-${t}`}
+                            className="px-2 py-1 text-xs rounded bg-red-100 dark:bg-red-800 text-red-800 dark:text-red-200"
+                          >
+                            {t}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="mt-6 flex justify-between gap-2">
                 <button
-                  onClick={() => setInviteModalOpen(false)}
-                  className="px-4 py-2 rounded bg-gray-300 text-gray-800 hover:bg-gray-400"
+                  onClick={() => {
+                    setInviteResults(null);
+                    setInviteQueue([]);
+                    setInviteValue("");
+                  }}
+                  className="px-3 py-2 rounded bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-100 hover:bg-gray-300 dark:hover:bg-gray-600"
                 >
-                  닫기
+                  초기화
                 </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setInviteModalOpen(false)}
+                    className="px-4 py-2 rounded bg-gray-300 text-gray-800 hover:bg-gray-400"
+                  >
+                    닫기
+                  </button>
+                  <button
+                    onClick={() => void handleInvite()}
+                    disabled={inviteQueue.length === 0 || isInviting}
+                    className={`px-4 py-2 rounded text-white ${
+                      inviteQueue.length === 0 || isInviting
+                        ? "bg-blue-400/50 cursor-not-allowed"
+                        : "bg-blue-500 hover:bg-blue-600"
+                    }`}
+                  >
+                    {isInviting ? "초대 중..." : "초대"}
+                  </button>
+                </div>
               </div>
             </motion.div>
           </motion.div>
