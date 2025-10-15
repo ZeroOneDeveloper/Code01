@@ -99,6 +99,7 @@ int main(void) {
   );
   const [inputDescription, setInputDescription] = useState("");
   const [outputDescription, setOutputDescription] = useState("");
+  const [source, setSource] = useState("");
   const [conditions, setConditions] = useState<string[]>([""]);
   const [examplePairs, setExamplePairs] = useState([{ input: "", output: "" }]);
   // 태그
@@ -228,6 +229,7 @@ int main(void) {
         );
         setInputDescription(p.input_description ?? "");
         setOutputDescription(p.output_description ?? "");
+        setSource(typeof p.source === "string" ? p.source : "");
         setConditions(
           Array.isArray(p.conditions) && p.conditions.length
             ? (p.conditions as string[])
@@ -547,6 +549,19 @@ int main(void) {
             value={outputDescription}
             onChange={(e) => setOutputDescription(e.target.value)}
           />
+        </div>
+        <div className="flex flex-col gap-4">
+          <h1 className="text-2xl font-bold">출처 (선택)</h1>
+          <input
+            type="text"
+            className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-black dark:text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200"
+            placeholder="예: 백준 1234, 원문 링크, 저자 등"
+            value={source}
+            onChange={(e) => setSource(e.target.value)}
+          />
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            출처는 비워둘 수 있어요.
+          </p>
         </div>
         <div className="flex flex-col gap-4">
           <h1 className="text-2xl font-bold flex items-center gap-2">
@@ -948,6 +963,7 @@ int main(void) {
                     : null,
                   available_languages: availableLanguages,
                   grade: grade || null,
+                  source: source.trim() || null,
                   tags: tags,
                 };
 
