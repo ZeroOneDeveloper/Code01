@@ -1,6 +1,6 @@
 "use client";
 
-import React, { JSX, useEffect, useState } from "react";
+import React, { JSX, useEffect, useRef, useState } from "react";
 import { useTheme } from "next-themes";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 
@@ -111,6 +111,74 @@ int main(void) {
 
   const [editorTheme, setEditorTheme] = useState("light");
   const { theme } = useTheme();
+  // --- refs for first-error scroll/focus ---
+  const titleRef = useRef<HTMLInputElement>(null);
+  const descriptionRef = useRef<HTMLTextAreaElement>(null);
+  const publishedAtRef = useRef<HTMLInputElement>(null);
+  const inputDescRef = useRef<HTMLTextAreaElement>(null);
+  const outputDescRef = useRef<HTMLTextAreaElement>(null);
+  const languagesRef = useRef<HTMLDivElement>(null);
+  const gradeRef = useRef<HTMLDivElement>(null);
+  const conditionsRef = useRef<HTMLInputElement>(null);
+  const examplesRef = useRef<HTMLTextAreaElement>(null);
+  const deadlineRef = useRef<HTMLInputElement>(null);
+  const scrollIntoCenterAndFocus = (el: HTMLElement | null | undefined) => {
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    // try to focus the element or its first focusable child
+    if (typeof el.focus === "function") {
+      el.focus({ preventScroll: true } as any);
+    } else {
+      const focusable = el.querySelector<HTMLElement>(
+        "input, textarea, button, select, [tabindex]:not([tabindex='-1'])",
+      );
+      focusable?.focus({ preventScroll: true } as any);
+    }
+  };
+
+  const focusFirstError = (e: FieldErrors) => {
+    const order: (keyof FieldErrors)[] = [
+      "title",
+      "description",
+      "publishedAt",
+      "inputDescription",
+      "outputDescription",
+      "availableLanguages",
+      "grade",
+      "conditions",
+      "examples",
+      "deadline",
+    ];
+    for (const key of order) {
+      if (!e[key]) continue;
+      switch (key) {
+        case "title":
+          return scrollIntoCenterAndFocus(titleRef.current!);
+        case "description":
+          return scrollIntoCenterAndFocus(descriptionRef.current!);
+        case "publishedAt":
+          return scrollIntoCenterAndFocus(publishedAtRef.current!);
+        case "inputDescription":
+          return scrollIntoCenterAndFocus(inputDescRef.current!);
+        case "outputDescription":
+          return scrollIntoCenterAndFocus(outputDescRef.current!);
+        case "availableLanguages":
+          return scrollIntoCenterAndFocus(
+            languagesRef.current?.querySelector("button") as HTMLElement,
+          );
+        case "grade":
+          return scrollIntoCenterAndFocus(
+            gradeRef.current?.querySelector("button") as HTMLElement,
+          );
+        case "conditions":
+          return scrollIntoCenterAndFocus(conditionsRef.current!);
+        case "examples":
+          return scrollIntoCenterAndFocus(examplesRef.current!);
+        case "deadline":
+          return scrollIntoCenterAndFocus(deadlineRef.current!);
+      }
+    }
+  };
 
   // --- transfer organization modal state ---
   const [isTransferOpen, setIsTransferOpen] = useState(false);
@@ -123,6 +191,33 @@ int main(void) {
   const [loadingTransfer, setLoadingTransfer] = useState(false);
   // prevent double submit on create/update
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // inline validation state (immediate guidance)
+  type FieldErrors = {
+    title?: string;
+    description?: string;
+    publishedAt?: string;
+    inputDescription?: string;
+    outputDescription?: string;
+    availableLanguages?: string;
+    grade?: string;
+    conditions?: string;
+    examples?: string;
+    deadline?: string;
+  };
+  const [errors, setErrors] = useState<FieldErrors>({});
+  const [touched, setTouched] = useState<Record<keyof FieldErrors, boolean>>({
+    title: false,
+    description: false,
+    publishedAt: false,
+    inputDescription: false,
+    outputDescription: false,
+    availableLanguages: false,
+    grade: false,
+    conditions: false,
+    examples: false,
+    deadline: false,
+  });
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -383,6 +478,45 @@ int main(void) {
     setTagInput("");
   };
 
+  const computeErrors = (): FieldErrors => {
+    const e: FieldErrors = {};
+    if (!title.trim()) e.title = "제목을 입력하세요.";
+    if (!description.trim()) e.description = "문제 설명을 입력하세요.";
+    if (!publishedAt || !isValidDate(publishedAt))
+      e.publishedAt = "유효한 날짜 및 시간을 입력하세요.";
+    if (!inputDescription.trim())
+      e.inputDescription = "입력 설명을 입력하세요.";
+    if (!outputDescription.trim())
+      e.outputDescription = "출력 설명을 입력하세요.";
+    if (!Array.isArray(availableLanguages) || availableLanguages.length === 0)
+      e.availableLanguages = "최소 1개 언어를 선택하세요.";
+    if (!grade) e.grade = "난이도를 선택하세요.";
+    if (!conditions.every((c) => c.trim() !== ""))
+      e.conditions = "모든 조건이 비어있지 않아야 합니다.";
+    if (!examplePairs.every((p) => (p.output ?? "").trim() !== ""))
+      e.examples = "모든 예시 출력이 비어있지 않아야 합니다.";
+    if (hasDeadline && (!deadline || !isValidDate(deadline)))
+      e.deadline = "유효한 마감 기한을 입력하세요.";
+    return e;
+  };
+
+  useEffect(() => {
+    setErrors(computeErrors());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    title,
+    description,
+    publishedAt,
+    inputDescription,
+    outputDescription,
+    availableLanguages,
+    grade,
+    conditions,
+    examplePairs,
+    hasDeadline,
+    deadline,
+  ]);
+
   return (
     <div className="relative min-h-screen flex flex-col justify-between">
       <div className="flex flex-col justify-center gap-8 p-6">
@@ -396,34 +530,83 @@ int main(void) {
             제목 <span className="text-red-500">*</span>
           </h1>
           <input
+            ref={titleRef}
             type="text"
-            className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-black dark:text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200"
+            className={`w-full p-3 border rounded-md bg-white dark:bg-gray-800 text-black dark:text-white shadow-sm focus:outline-none focus:ring-2 transition duration-200 ${
+              touched.title && errors.title
+                ? "border-red-500 focus:ring-red-500 focus:border-red-500"
+                : "border-gray-300 dark:border-gray-600 focus:ring-blue-500 focus:border-blue-500"
+            }`}
             placeholder="문제 제목을 입력하세요"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
+            onBlur={() => setTouched((t) => ({ ...t, title: true }))}
+            aria-invalid={touched.title && !!errors.title}
+            aria-describedby={
+              touched.title && errors.title ? "error-title" : undefined
+            }
           />
+          {touched.title && errors.title && (
+            <p id="error-title" className="text-sm text-red-500">
+              {errors.title}
+            </p>
+          )}
         </div>
         <div className="flex flex-col gap-4">
           <h1 className="text-2xl font-bold flex items-center gap-1">
             문제 설명 <span className="text-red-500">*</span>
           </h1>
           <textarea
-            className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-black dark:text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200 resize-none min-h-[150px]"
+            ref={descriptionRef}
+            className={`w-full p-3 border rounded-md bg-white dark:bg-gray-800 text-black dark:text-white shadow-sm focus:outline-none focus:ring-2 transition duration-200 resize-none min-h-[150px] ${
+              touched.description && errors.description
+                ? "border-red-500 focus:ring-red-500 focus:border-red-500"
+                : "border-gray-300 dark:border-gray-600 focus:ring-blue-500 focus:border-blue-500"
+            }`}
             placeholder="문제에 대한 설명을 입력하세요"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
+            onBlur={() => setTouched((t) => ({ ...t, description: true }))}
+            aria-invalid={touched.description && !!errors.description}
+            aria-describedby={
+              touched.description && errors.description
+                ? "error-description"
+                : undefined
+            }
           />
+          {touched.description && errors.description && (
+            <p id="error-description" className="text-sm text-red-500">
+              {errors.description}
+            </p>
+          )}
         </div>
         <div className="flex flex-col gap-4">
           <h1 className="text-2xl font-bold flex items-center gap-1">
             공개 날짜 및 시간 <span className="text-red-500">*</span>
           </h1>
           <input
+            ref={publishedAtRef}
             type="datetime-local"
-            className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-black dark:text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200"
+            className={`w-full p-3 border rounded-md bg-white dark:bg-gray-800 text-black dark:text-white shadow-sm focus:outline-none focus:ring-2 transition duration-200 ${
+              touched.publishedAt && errors.publishedAt
+                ? "border-red-500 focus:ring-red-500 focus:border-red-500"
+                : "border-gray-300 dark:border-gray-600 focus:ring-blue-500 focus:border-blue-500"
+            }`}
             value={publishedAt}
             onChange={(e) => setPublishedAt(e.target.value)}
+            onBlur={() => setTouched((t) => ({ ...t, publishedAt: true }))}
+            aria-invalid={touched.publishedAt && !!errors.publishedAt}
+            aria-describedby={
+              touched.publishedAt && errors.publishedAt
+                ? "error-publishedAt"
+                : undefined
+            }
           />
+          {touched.publishedAt && errors.publishedAt && (
+            <p id="error-publishedAt" className="text-sm text-red-500">
+              {errors.publishedAt}
+            </p>
+          )}
         </div>
         <div className="flex flex-col gap-4">
           <h1 className="text-2xl font-bold flex items-center gap-2">
@@ -446,18 +629,35 @@ int main(void) {
           <AnimatePresence>
             {hasDeadline && (
               <motion.input
+                ref={deadlineRef}
                 key="deadline-input"
                 initial={{ opacity: 0, y: -6 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -6 }}
                 transition={{ duration: 0.15 }}
                 type="datetime-local"
-                className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-black dark:text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200"
+                className={`w-full p-3 border rounded-md bg-white dark:bg-gray-800 text-black dark:text-white shadow-sm focus:outline-none focus:ring-2 transition duration-200 ${
+                  touched.deadline && errors.deadline
+                    ? "border-red-500 focus:ring-red-500 focus:border-red-500"
+                    : "border-gray-300 dark:border-gray-600 focus:ring-blue-500 focus:border-blue-500"
+                }`}
                 value={deadline}
                 onChange={(e) => setDeadline(e.target.value)}
+                onBlur={() => setTouched((t) => ({ ...t, deadline: true }))}
+                aria-invalid={touched.deadline && !!errors.deadline}
+                aria-describedby={
+                  touched.deadline && errors.deadline
+                    ? "error-deadline"
+                    : undefined
+                }
               />
             )}
           </AnimatePresence>
+          {hasDeadline && touched.deadline && errors.deadline && (
+            <p id="error-deadline" className="text-sm text-red-500">
+              {errors.deadline}
+            </p>
+          )}
         </div>
         <div className="flex flex-col gap-4">
           <h1 className="text-2xl font-bold flex items-center gap-1">
@@ -492,6 +692,7 @@ int main(void) {
                 className="flex gap-2 items-center"
               >
                 <input
+                  ref={index === 0 ? conditionsRef : null}
                   type="text"
                   value={condition}
                   onChange={(e) => {
@@ -501,6 +702,7 @@ int main(void) {
                   }}
                   className="flex-grow p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-black dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200"
                   placeholder={`조건 ${index + 1}`}
+                  onBlur={() => setTouched((t) => ({ ...t, conditions: true }))}
                 />
                 <button
                   type="button"
@@ -535,28 +737,71 @@ int main(void) {
           >
             조건 추가
           </button>
+          {touched.conditions && errors.conditions && (
+            <p id="error-conditions" className="text-sm text-red-500">
+              {errors.conditions}
+            </p>
+          )}
         </div>
         <div className="flex flex-col gap-4">
           <h1 className="text-2xl font-bold flex items-center gap-1">
             입력 설명 <span className="text-red-500">*</span>
           </h1>
           <textarea
-            className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-black dark:text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200 resize-none min-h-[150px]"
+            ref={inputDescRef}
+            className={`w-full p-3 border rounded-md bg-white dark:bg-gray-800 text-black dark:text-white shadow-sm focus:outline-none focus:ring-2 transition duration-200 resize-none min-h-[150px] ${
+              touched.inputDescription && errors.inputDescription
+                ? "border-red-500 focus:ring-red-500 focus:border-red-500"
+                : "border-gray-300 dark:border-gray-600 focus:ring-blue-500 focus:border-blue-500"
+            }`}
             placeholder="입력 형식에 대한 설명을 입력하세요"
             value={inputDescription}
             onChange={(e) => setInputDescription(e.target.value)}
+            onBlur={() => setTouched((t) => ({ ...t, inputDescription: true }))}
+            aria-invalid={touched.inputDescription && !!errors.inputDescription}
+            aria-describedby={
+              touched.inputDescription && errors.inputDescription
+                ? "error-inputDescription"
+                : undefined
+            }
           />
+          {touched.inputDescription && errors.inputDescription && (
+            <p id="error-inputDescription" className="text-sm text-red-500">
+              {errors.inputDescription}
+            </p>
+          )}
         </div>
         <div className="flex flex-col gap-4">
           <h1 className="text-2xl font-bold flex items-center gap-1">
             출력 설명 <span className="text-red-500">*</span>
           </h1>
           <textarea
-            className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-black dark:text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200 resize-none min-h-[150px]"
+            ref={outputDescRef}
+            className={`w-full p-3 border rounded-md bg-white dark:bg-gray-800 text-black dark:text-white shadow-sm focus:outline-none focus:ring-2 transition duration-200 resize-none min-h-[150px] ${
+              touched.outputDescription && errors.outputDescription
+                ? "border-red-500 focus:ring-red-500 focus:border-red-500"
+                : "border-gray-300 dark:border-gray-600 focus:ring-blue-500 focus:border-blue-500"
+            }`}
             placeholder="출력 형식에 대한 설명을 입력하세요"
             value={outputDescription}
             onChange={(e) => setOutputDescription(e.target.value)}
+            onBlur={() =>
+              setTouched((t) => ({ ...t, outputDescription: true }))
+            }
+            aria-invalid={
+              touched.outputDescription && !!errors.outputDescription
+            }
+            aria-describedby={
+              touched.outputDescription && errors.outputDescription
+                ? "error-outputDescription"
+                : undefined
+            }
           />
+          {touched.outputDescription && errors.outputDescription && (
+            <p id="error-outputDescription" className="text-sm text-red-500">
+              {errors.outputDescription}
+            </p>
+          )}
         </div>
         <div className="flex flex-col gap-4">
           <h1 className="text-2xl font-bold">출처</h1>
@@ -663,6 +908,7 @@ int main(void) {
                   placeholder="예시 입력"
                 />
                 <textarea
+                  ref={index === 0 ? examplesRef : null}
                   value={pair.output}
                   onChange={(e) => {
                     const newPairs = [...examplePairs];
@@ -671,6 +917,7 @@ int main(void) {
                   }}
                   className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-black dark:text-white resize-none min-h-[80px] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200"
                   placeholder="예시 출력"
+                  onBlur={() => setTouched((t) => ({ ...t, examples: true }))}
                 />
               </motion.div>
             ))}
@@ -684,6 +931,11 @@ int main(void) {
           >
             예시 추가
           </button>
+          {touched.examples && errors.examples && (
+            <p id="error-examples" className="text-sm text-red-500">
+              {errors.examples}
+            </p>
+          )}
         </div>
         <div className="flex flex-col gap-4">
           <h1 className="text-2xl font-bold">문제 코드 기본값</h1>
@@ -705,7 +957,7 @@ int main(void) {
           <h1 className="text-2xl font-bold flex items-center gap-1">
             제출 가능 언어 <span className="text-red-500">*</span>
           </h1>
-          <div className="flex gap-2 flex-wrap">
+          <div ref={languagesRef} className="flex gap-2 flex-wrap">
             {ALL_LANGUAGES.map(({ value, label, icon }) => {
               const isSelected = availableLanguages.includes(value);
               return (
@@ -713,6 +965,7 @@ int main(void) {
                   key={value}
                   type="button"
                   onClick={() => {
+                    setTouched((t) => ({ ...t, availableLanguages: true }));
                     setAvailableLanguages((prev) =>
                       isSelected
                         ? prev.filter((l) => l !== value)
@@ -731,13 +984,18 @@ int main(void) {
               );
             })}
           </div>
+          {touched.availableLanguages && errors.availableLanguages && (
+            <p id="error-availableLanguages" className="text-sm text-red-500">
+              {errors.availableLanguages}
+            </p>
+          )}
         </div>
 
         <div className="flex flex-col gap-4 px-6">
           <h1 className="text-2xl font-bold flex items-center gap-1">
             난이도 <span className="text-red-500">*</span>
           </h1>
-          <div className="flex gap-2 flex-wrap">
+          <div ref={gradeRef} className="flex gap-2 flex-wrap">
             {(["expert", "advanced", "intermediate", "beginner"] as const).map(
               (level) => {
                 const isActive = grade === level;
@@ -767,7 +1025,10 @@ int main(void) {
                   <button
                     key={level}
                     type="button"
-                    onClick={() => setGrade(level)}
+                    onClick={() => {
+                      setTouched((t) => ({ ...t, grade: true }));
+                      setGrade(level);
+                    }}
                     className={`${baseStyle} ${isActive ? activeStyle : inactiveStyle}`}
                   >
                     {icon}
@@ -777,6 +1038,11 @@ int main(void) {
               },
             )}
           </div>
+          {touched.grade && errors.grade && (
+            <p id="error-grade" className="text-sm text-red-500">
+              {errors.grade}
+            </p>
+          )}
         </div>
         <div className="flex flex-col gap-2">
           <label className="text-xl font-bold">시간 제한 (ms)</label>
@@ -872,6 +1138,22 @@ int main(void) {
             onClick={async () => {
               if (isSubmitting) return; // guard double click
 
+              setTouched({
+                title: true,
+                description: true,
+                publishedAt: true,
+                inputDescription: true,
+                outputDescription: true,
+                availableLanguages: true,
+                grade: true,
+                conditions: true,
+                examples: true,
+                deadline: hasDeadline ? true : false,
+              });
+
+              const currentErrors = computeErrors();
+              setErrors(currentErrors);
+              focusFirstError(currentErrors);
               // --- validations ---
               if (
                 !title ||
