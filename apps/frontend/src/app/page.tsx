@@ -18,7 +18,7 @@ export default async function Home() {
 
   const { data: submissions } = await supabase
     .from("problem_submissions")
-    .select("problem_id, is_correct")
+    .select("problem_id, passed_all")
     .in("problem_id", problemIds);
 
   const { data: users } = await supabase.from("users").select("id, name");
@@ -32,7 +32,7 @@ export default async function Home() {
   for (const id of problemIds) {
     const related = submissions?.filter((s) => s.problem_id === id) ?? [];
     const submitted = related.length;
-    const solved = related.filter((s) => s.is_correct).length;
+    const solved = related.filter((s) => s.passed_all).length;
     const accuracy = submitted ? (solved / submitted) * 100 : 0;
     statsMap[id] = { solved, submitted, accuracy };
   }
