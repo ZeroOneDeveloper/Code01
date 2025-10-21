@@ -398,7 +398,7 @@ int main(void) {
       .eq("organization_id", params.organizationId)
       .single();
 
-    if (memberErr || !member || member.role !== "ADMIN") {
+    if (memberErr || !member || member.role.toUpperCase() !== "ADMIN") {
       setLoadingTransfer(false);
       toast.error("권한이 없습니다.");
       return;
@@ -409,7 +409,7 @@ int main(void) {
       .from("organization_members")
       .select("organization_id")
       .eq("user_id", user.id)
-      .eq("role", "ADMIN");
+      .eq("role", "admin");
 
     if (adminErr || !adminRows) {
       setLoadingTransfer(false);
