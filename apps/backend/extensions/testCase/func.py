@@ -67,7 +67,7 @@ async def generate_unique_cases(
         seed += 1
 
         # 무한 루프 방지용 안전 장치
-        if seed - base_seed > count * 10:
+        if seed - base_seed > count * 100:
             raise RuntimeError(
                 "너무 많은 중복이 발생하여 충분한 케이스를 생성하지 못했습니다."
             )
