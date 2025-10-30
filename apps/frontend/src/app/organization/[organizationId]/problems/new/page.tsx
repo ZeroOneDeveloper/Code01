@@ -104,7 +104,6 @@ int main(void) {
   const [examplePairs, setExamplePairs] = useState([{ input: "", output: "" }]);
   // 태그
   const [tags, setTags] = useState<string[]>([]);
-  const [tagInput, setTagInput] = useState("");
 
   const [hasDeadline, setHasDeadline] = useState(false);
   const [deadline, setDeadline] = useState("");
@@ -476,11 +475,141 @@ int main(void) {
   const [tagSuggestions, setTagSuggestions] = useState<string[]>([]);
   const normalizeTag = (s: string) => s.trim();
 
-  const handleAddTag = () => {
-    const t = normalizeTag(tagInput);
-    if (!t) return;
-    setTags((prev) => Array.from(new Set([...prev, t])));
-    setTagInput("");
+  // Inline, polished tag selector with autocomplete dropdown
+  const TagSelector: React.FC<{
+    value: string[];
+    onChange: (next: string[]) => void;
+    suggestions: string[];
+  }> = ({ value, onChange, suggestions }) => {
+    const [open, setOpen] = useState(false);
+    const [q, setQ] = useState("");
+    const ref = useRef<HTMLDivElement | null>(null);
+
+    useEffect(() => {
+      const onDocClick = (e: MouseEvent) => {
+        if (!ref.current) return;
+        if (!ref.current.contains(e.target as Node)) setOpen(false);
+      };
+      document.addEventListener("mousedown", onDocClick);
+      return () => document.removeEventListener("mousedown", onDocClick);
+    }, []);
+
+    const selected = new Set(value.map((v) => normalizeTag(v)));
+    const filtered = suggestions
+      .filter(
+        (s) =>
+          !selected.has(normalizeTag(s)) &&
+          s.toLowerCase().includes(q.toLowerCase()),
+      )
+      .slice(0, 8);
+
+    function addTag(label: string) {
+      const t = normalizeTag(label);
+      if (!t) return;
+      if (!value.includes(t)) onChange([...value, t]);
+      setQ("");
+      setOpen(false);
+    }
+    function removeTag(label: string) {
+      onChange(value.filter((v) => v !== label));
+    }
+
+    const Highlight: React.FC<{ text: string; q: string }> = ({ text, q }) => {
+      if (!q) return <>{text}</>;
+      const i = text.toLowerCase().indexOf(q.toLowerCase());
+      if (i === -1) return <>{text}</>;
+      return (
+        <>
+          {text.slice(0, i)}
+          <span className="font-semibold underline decoration-dotted underline-offset-4">
+            {text.slice(i, i + q.length)}
+          </span>
+          {text.slice(i + q.length)}
+        </>
+      );
+    };
+
+    return (
+      <div ref={ref} className="relative">
+        <div
+          className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-black dark:text-white shadow-sm transition duration-200 focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500 flex flex-wrap items-center gap-2"
+          onClick={() => setOpen(true)}
+        >
+          {value.map((v) => (
+            <span
+              key={v}
+              className="inline-flex items-center gap-1 rounded-full bg-gray-200 dark:bg-gray-700 text-black dark:text-white px-2.5 py-1 text-sm"
+            >
+              <span>{v}</span>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  removeTag(v);
+                }}
+                className="rounded-full hover:bg-gray-300 dark:hover:bg-gray-600 p-0.5"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </span>
+          ))}
+          <input
+            value={q}
+            onChange={(e) => {
+              setQ(e.target.value);
+              setOpen(true);
+            }}
+            onKeyDown={(e) => {
+              if (
+                (e.key === "Enter" || e.key === "," || e.key === "Tab") &&
+                q.trim()
+              ) {
+                e.preventDefault();
+                addTag(q);
+              }
+              if (e.key === "Backspace" && !q && value.length) {
+                removeTag(value[value.length - 1]);
+              }
+            }}
+            placeholder={value.length ? "" : "태그 입력…"}
+            className="flex-1 bg-transparent text-black dark:text-white outline-none placeholder:text-gray-400"
+          />
+        </div>
+
+        {open && (filtered.length > 0 || q) && (
+          <ul className="absolute z-20 mt-2 w-full max-h-64 overflow-auto rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 shadow-xl">
+            {filtered.map((item) => (
+              <li key={item}>
+                <button
+                  type="button"
+                  onClick={() => addTag(item)}
+                  className="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-800"
+                >
+                  <Highlight text={item} q={q} />
+                </button>
+              </li>
+            ))}
+            {q &&
+              !suggestions.some(
+                (s) => s.toLowerCase() === q.trim().toLowerCase(),
+              ) && (
+                <li className="border-t border-gray-100 dark:border-gray-800">
+                  <button
+                    type="button"
+                    onClick={() => addTag(q)}
+                    className="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center gap-2"
+                  >
+                    <span className="inline-flex items-center justify-center rounded-md border px-1.5 text-xs">
+                      +
+                    </span>
+                    “{q}” 새 태그 추가
+                  </button>
+                </li>
+              )}
+          </ul>
+        )}
+      </div>
+    );
   };
 
   const computeErrors = (): FieldErrors => {
@@ -880,51 +1009,11 @@ int main(void) {
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <Tags className="w-6 h-6" /> 태그
           </h1>
-          <div className="flex items-center gap-2">
-            <input
-              type="text"
-              value={tagInput}
-              onChange={(e) => setTagInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === ",") {
-                  e.preventDefault();
-                  handleAddTag();
-                }
-              }}
-              className="flex-grow p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-black dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200"
-              list="tags-datalist"
-              placeholder="예: 그래프, 탐색, 너비 우선 탐색"
-            />
-            <button
-              type="button"
-              onClick={handleAddTag}
-              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-            >
-              추가
-            </button>
-          </div>
-          <datalist id="tags-datalist">
-            {tagSuggestions.map((t) => (
-              <option key={t} value={t} />
-            ))}
-          </datalist>
-          <div className="flex gap-2 flex-wrap">
-            {tags.map((t, idx) => (
-              <span
-                key={`${t}-${idx}`}
-                className="inline-flex items-center gap-1 px-2 py-1 rounded bg-gray-200 dark:bg-gray-700 text-black dark:text-white"
-              >
-                <span className="text-sm">{t}</span>
-                <button
-                  type="button"
-                  onClick={() => setTags(tags.filter((_, i) => i !== idx))}
-                  className="rounded p-0.5 hover:bg-gray-300 dark:hover:bg-gray-600"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </span>
-            ))}
-          </div>
+          <TagSelector
+            value={tags}
+            onChange={setTags}
+            suggestions={tagSuggestions}
+          />
           <p className="text-xs text-gray-500 dark:text-gray-400">
             입력한 태그를 그대로 저장합니다. 한국어/영문 모두 입력 가능해요.
           </p>
