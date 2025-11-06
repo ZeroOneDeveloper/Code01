@@ -110,14 +110,15 @@ const NewProblemPage = () => {
   const [source, setSource] = useState("");
   // --- image upload state/refs ---
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [imageTarget, setImageTarget] = useState<
-    "description" | "input" | "output" | null
-  >(null);
   const [conditions, setConditions] = useState<string[]>([""]);
   const [examplePairs, setExamplePairs] = useState([{ input: "", output: "" }]);
   // track images uploaded via editor to persist on save
   const [uploadedImages, setUploadedImages] = useState<
-    { path: string; url: string; section: "description" | "input" | "output" }[]
+    {
+      path: string;
+      url: string;
+      section?: "description" | "input" | "output";
+    }[]
   >([]);
   // 태그
   const [tags, setTags] = useState<string[]>([]);
@@ -255,9 +256,35 @@ const NewProblemPage = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // --- image upload helpers (Markdown image insertion) ---
-  const openImagePicker = (target: "description" | "input" | "output") => {
-    setImageTarget(target);
-    fileInputRef.current?.click();
+
+  // Supabase Storage keys allow only a limited ASCII set (see storage-api isValidKey).
+  // Strip disallowed chars from the filename to avoid "Invalid key".
+  const sanitizeStorageFilename = (filename: string): string => {
+    // keep only last path segment
+    const last = filename.split("/").pop() ?? "file";
+    // separate extension
+    const dot = last.lastIndexOf(".");
+    const base = dot >= 0 ? last.slice(0, dot) : last;
+    const ext = dot >= 0 ? last.slice(dot) : "";
+
+    // normalize and remove diacritics; non‑ASCII letters become empty
+    const normalized = base.normalize("NFKD").replace(/[\u0300-\u036f]/g, "");
+
+    // Allowed per storage-api: (\w|/|!|-|\.|\*|'|\(|\)| |&|\$|@|=|;|:|\+|,|\?)
+    // We only use a subset for filenames (no slash). Replace others with '_'.
+    const allowedChar = /[A-Za-z0-9_!\-.\*'() &\$@=;:\+,\?]/g;
+    const safeBase = (normalized.match(allowedChar) || [])
+      .join("")
+      // collapse spaces to underscore for nicer URLs
+      .replace(/\s+/g, "_")
+      // trim underscores/dots at ends
+      .replace(/^[_\.]+|[_\.]+$/g, "");
+
+    // Keep a conservative extension (letters, digits, dot, dash, underscore)
+    const safeExt = ext.replace(/[^A-Za-z0-9._-]/g, "");
+
+    const finalBase = safeBase || "file";
+    return `${finalBase}${safeExt}`;
   };
 
   const insertAtCursor = (
@@ -293,7 +320,8 @@ const NewProblemPage = () => {
         toast.error("로그인이 필요합니다.");
         return;
       }
-      const path = `${user.id}/problems/${Date.now()}_${f.name}`;
+      const safeName = sanitizeStorageFilename(f.name);
+      const path = `${user.id}/problems/${Date.now()}_${safeName}`;
       const { error: upErr } = await supabase.storage
         .from("problem-assets")
         .upload(path, f, { upsert: true, contentType: f.type });
@@ -315,37 +343,8 @@ const NewProblemPage = () => {
         return;
       }
 
-      const snippet = `![image](${url})`;
-      if (imageTarget === "description") {
-        insertAtCursor(
-          descriptionRef.current as HTMLTextAreaElement | null,
-          snippet,
-          setDescription,
-        );
-      } else if (imageTarget === "input") {
-        insertAtCursor(
-          inputDescRef.current as HTMLTextAreaElement | null,
-          snippet,
-          setInputDescription,
-        );
-      } else if (imageTarget === "output") {
-        insertAtCursor(
-          outputDescRef.current as HTMLTextAreaElement | null,
-          snippet,
-          setOutputDescription,
-        );
-      }
-      // remember this image to link with the problem on save
-      setUploadedImages((prev) => [
-        ...prev,
-        {
-          path,
-          url,
-          section: imageTarget as "description" | "input" | "output",
-        },
-      ]);
-      setImageTarget(null);
-      toast.success("이미지를 삽입했습니다.");
+      setUploadedImages((prev) => [...prev, { path, url }]);
+      toast.success("업로드 완료! '파일' 목록에서 삽입하거나 복사하세요.");
     } catch {
       toast.error("이미지 업로드 중 오류가 발생했습니다.");
     }
@@ -823,6 +822,104 @@ const NewProblemPage = () => {
         `}</style>
       </Head>
       <div className="flex flex-col justify-center gap-8 p-6">
+        {/* Files: single uploader + list */}
+        <div className="flex flex-col gap-3 rounded-md border border-gray-200 dark:border-gray-700 p-3 bg-white dark:bg-gray-900">
+          <div className="flex items-center justify-between">
+            <h1 className="text-2xl font-bold">파일</h1>
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="px-3 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 text-sm"
+            >
+              이미지 업로드
+            </button>
+          </div>
+          {uploadedImages.length > 0 ? (
+            <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {uploadedImages.map((img, idx) => (
+                <li
+                  key={`${img.path}-${idx}`}
+                  className="flex items-center gap-3 rounded-md border border-gray-200 dark:border-gray-700 p-2 bg-white dark:bg-gray-800"
+                >
+                  <img
+                    src={img.url}
+                    alt="uploaded"
+                    className="h-16 w-16 object-contain rounded"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-medium truncate">
+                      {img.path.split("/").pop()}
+                    </div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                      {img.url}
+                    </div>
+                    <div className="mt-1 flex flex-wrap gap-1.5">
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            await navigator.clipboard.writeText(
+                              `![image](${img.url})`,
+                            );
+                            toast.success("마크다운 복사됨");
+                          } catch {
+                            toast.error("클립보드 복사 실패");
+                          }
+                        }}
+                        className="px-2 py-0.5 rounded border border-gray-300 dark:border-gray-600 text-xs hover:bg-gray-100 dark:hover:bg-gray-700"
+                      >
+                        Copy MD
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          insertAtCursor(
+                            descriptionRef.current,
+                            `![image](${img.url})`,
+                            setDescription,
+                          )
+                        }
+                        className="px-2 py-0.5 rounded border border-gray-300 dark:border-gray-600 text-xs hover:bg-gray-100 dark:hover:bg-gray-700"
+                      >
+                        설명에 삽입
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          insertAtCursor(
+                            inputDescRef.current,
+                            `![image](${img.url})`,
+                            setInputDescription,
+                          )
+                        }
+                        className="px-2 py-0.5 rounded border border-gray-300 dark:border-gray-600 text-xs hover:bg-gray-100 dark:hover:bg-gray-700"
+                      >
+                        입력에 삽입
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          insertAtCursor(
+                            outputDescRef.current,
+                            `![image](${img.url})`,
+                            setOutputDescription,
+                          )
+                        }
+                        className="px-2 py-0.5 rounded border border-gray-300 dark:border-gray-600 text-xs hover:bg-gray-100 dark:hover:bg-gray-700"
+                      >
+                        출력에 삽입
+                      </button>
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              아직 업로드된 파일이 없습니다.
+            </p>
+          )}
+        </div>
         {isEditing && (
           <div className="mb-2 rounded-md border border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-950 p-3 text-sm">
             현재 <strong>문제 #{editProblemId}</strong> 수정 중입니다.
@@ -859,19 +956,6 @@ const NewProblemPage = () => {
           <h1 className="text-2xl font-bold flex items-center gap-1">
             문제 설명 <span className="text-red-500">*</span>
           </h1>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => openImagePicker("description")}
-              className="px-3 py-1 rounded-md border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 text-sm"
-            >
-              이미지 업로드
-            </button>
-            <span className="text-xs text-gray-500 dark:text-gray-400">
-              이미지: <code>![설명](url)</code> · 수식: <code>$M_{"{n}"}</code>,{" "}
-              <code>$$ ... $$</code>
-            </span>
-          </div>
           <div className="text-xs text-gray-500 dark:text-gray-400">
             LaTeX: <code>$...$</code>, <code>$$...$$</code>
           </div>
@@ -1188,19 +1272,6 @@ const NewProblemPage = () => {
           <h1 className="text-2xl font-bold flex items-center gap-1">
             입력 설명 <span className="text-red-500">*</span>
           </h1>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => openImagePicker("input")}
-              className="px-3 py-1 rounded-md border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 text-sm"
-            >
-              이미지 업로드
-            </button>
-            <span className="text-xs text-gray-500 dark:text-gray-400">
-              이미지: <code>![설명](url)</code> · 수식: <code>$M_{"{n}"}</code>,{" "}
-              <code>$$ ... $$</code>
-            </span>
-          </div>
           <div className="text-xs text-gray-500 dark:text-gray-400">
             LaTeX: <code>$...$</code>, <code>$$...$$</code>
           </div>
@@ -1278,19 +1349,6 @@ const NewProblemPage = () => {
           <h1 className="text-2xl font-bold flex items-center gap-1">
             출력 설명 <span className="text-red-500">*</span>
           </h1>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => openImagePicker("output")}
-              className="px-3 py-1 rounded-md border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 text-sm"
-            >
-              이미지 업로드
-            </button>
-            <span className="text-xs text-gray-500 dark:text-gray-400">
-              이미지: <code>![설명](url)</code> · 수식: <code>$M_{"{n}"}</code>,{" "}
-              <code>$$ ... $$</code>
-            </span>
-          </div>
           <div className="text-xs text-gray-500 dark:text-gray-400">
             LaTeX: <code>$...$</code>, <code>$$...$$</code>
           </div>
@@ -1777,7 +1835,7 @@ const NewProblemPage = () => {
                         problem_id: editProblemId,
                         url: img.url,
                         path: img.path,
-                        section: img.section,
+                        section: img.section ?? null,
                       }));
                       const { error: assetsErr } = await supabase
                         .from("problem_assets")
@@ -1822,7 +1880,7 @@ const NewProblemPage = () => {
                         problem_id: createdId,
                         url: img.url,
                         path: img.path,
-                        section: img.section,
+                        section: img.section ?? null,
                       }));
                       const { error: assetsErr } = await supabase
                         .from("problem_assets")
