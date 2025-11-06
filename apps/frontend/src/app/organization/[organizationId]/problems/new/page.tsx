@@ -16,6 +16,11 @@ import { BsGraphUpArrow, BsGraphDownArrow, BsEmojiSmile } from "react-icons/bs";
 
 import type { Language, Problem } from "@lib/types";
 import { createClient } from "@lib/supabase/client";
+import Head from "next/head";
+import "katex/dist/katex.min.css";
+import type { Options as ReactMarkdownOptions } from "react-markdown";
+import type { Plugin, PluggableList } from "unified";
+import type { Node as UnistNode } from "unist";
 
 const ALL_LANGUAGES: { value: Language; label: string; icon: JSX.Element }[] = [
   {
@@ -52,6 +57,26 @@ function toInputLocal(dateIso: string | null | undefined) {
   }
 }
 
+// --- Normalize markdown text to avoid parsing issues caused by invisible/full-width chars
+const normalizeMarkdown = (s: string) =>
+  (s ?? "")
+    // 1) Unicode compatibility normalization (handles most full‑width forms)
+    .normalize("NFKC")
+    // 2) normalize common & exotic spaces
+    .replace(/\u00A0/g, " ") // no‑break space → space
+    .replace(/[\u2000-\u200A\u202F\u205F\u3000]/g, " ") // thin spaces → space
+    // 3) strip zero‑width & bidi controls that confuse parsers
+    .replace(
+      /[\u200B-\u200D\u2060\uFEFF\u00AD\u034F\u202A-\u202E\u2066-\u2069]/g,
+      "",
+    )
+    // 4) normalize smart quotes to ASCII to avoid delimiter confusion near emphasis markers
+    .replace(/[“”]/g, '"')
+    .replace(/[‘’]/g, "'")
+    // 5) ensure any remaining full‑width emphasis punctuation is ASCII (just in case)
+    .replace(/\uFF0A/g, "*") // ＊ → *
+    .replace(/\uFF3F/g, "_"); // ＿ → _
+
 const NewProblemPage = () => {
   const supabase = createClient();
   const router = useRouter();
@@ -72,24 +97,7 @@ const NewProblemPage = () => {
   const [grade, setGrade] = useState<
     "expert" | "advanced" | "intermediate" | "beginner" | ""
   >("");
-  const [code, setCode] = useState(`#include <stdio.h>
-
-int solution(int a, int b, int c) {
-  /* put your code here */
-}
-
-int main(void) {
-  int a, b, c;
-
-  // Read three integers from the user
-  scanf("%d %d %d", &a, &b, &c);
-  
-  // Call the solution function and print the median value
-  printf("%d", solution(a, b, c));
-  
-  return 0;
-}
-`);
+  const [code, setCode] = useState("");
   const [timeLimit, setTimeLimit] = useState<number | null>(null);
   const [memoryLimit, setMemoryLimit] = useState<number | null>(null);
   const [publishedAt, setPublishedAt] = useState(
@@ -100,8 +108,17 @@ int main(void) {
   const [inputDescription, setInputDescription] = useState("");
   const [outputDescription, setOutputDescription] = useState("");
   const [source, setSource] = useState("");
+  // --- image upload state/refs ---
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [imageTarget, setImageTarget] = useState<
+    "description" | "input" | "output" | null
+  >(null);
   const [conditions, setConditions] = useState<string[]>([""]);
   const [examplePairs, setExamplePairs] = useState([{ input: "", output: "" }]);
+  // track images uploaded via editor to persist on save
+  const [uploadedImages, setUploadedImages] = useState<
+    { path: string; url: string; section: "description" | "input" | "output" }[]
+  >([]);
   // 태그
   const [tags, setTags] = useState<string[]>([]);
 
@@ -109,6 +126,47 @@ int main(void) {
   const [deadline, setDeadline] = useState("");
 
   const [editorTheme, setEditorTheme] = useState("light");
+  // --- Markdown + KaTeX preview loader ---
+  type MDIO = UnistNode | string | undefined;
+  type MarkdownLibs = {
+    ReactMarkdown: React.ComponentType<ReactMarkdownOptions>;
+    remarkMath: Plugin<unknown[], MDIO, MDIO>;
+    remarkGfm: Plugin<unknown[], MDIO, MDIO>;
+    rehypeKatex: Plugin<unknown[], MDIO, MDIO>;
+  };
+  const [mdReady, setMdReady] = useState(false);
+  const mdLibsRef = useRef<MarkdownLibs | null>(null); // { ReactMarkdown, remarkMath, remarkGfm, rehypeKatex }
+  const previewDesc = true;
+  const previewInput = true;
+  const previewOutput = true;
+  const splitDesc = true;
+  const splitInput = true;
+  const splitOutput = true;
+  useEffect(() => {
+    (async () => {
+      try {
+        const [rm, rmath, rgfm, rkatex] = await Promise.all([
+          import("react-markdown"),
+          import("remark-math"),
+          import("remark-gfm"),
+          import("rehype-katex"),
+        ]);
+        mdLibsRef.current = {
+          ReactMarkdown:
+            rm.default as React.ComponentType<ReactMarkdownOptions>,
+          remarkMath: ((rmath as { default?: unknown })?.default ??
+            rmath) as unknown as Plugin<unknown[], MDIO, MDIO>,
+          remarkGfm: ((rgfm as { default?: unknown })?.default ??
+            rgfm) as unknown as Plugin<unknown[], MDIO, MDIO>,
+          rehypeKatex: ((rkatex as { default?: unknown })?.default ??
+            rkatex) as unknown as Plugin<unknown[], MDIO, MDIO>,
+        };
+        setMdReady(true);
+      } catch {
+        setMdReady(false);
+      }
+    })();
+  }, []);
   const { theme } = useTheme();
   // --- refs for first-error scroll/focus ---
   const titleRef = useRef<HTMLInputElement>(null);
@@ -131,12 +189,12 @@ int main(void) {
     el.scrollIntoView({ behavior: "smooth", block: "center" });
     // try to focus the element or its first focusable child
     if (typeof el.focus === "function") {
-      el.focus({ preventScroll: true } as any);
+      el.focus({ preventScroll: true });
     } else {
       const focusable = el.querySelector<HTMLElement>(
         "input, textarea, button, select, [tabindex]:not([tabindex='-1'])",
       );
-      focusable?.focus({ preventScroll: true } as any);
+      focusable?.focus({ preventScroll: true });
     }
   };
 
@@ -195,6 +253,103 @@ int main(void) {
   const [loadingTransfer, setLoadingTransfer] = useState(false);
   // prevent double submit on create/update
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // --- image upload helpers (Markdown image insertion) ---
+  const openImagePicker = (target: "description" | "input" | "output") => {
+    setImageTarget(target);
+    fileInputRef.current?.click();
+  };
+
+  const insertAtCursor = (
+    ref: HTMLTextAreaElement | null,
+    snippet: string,
+    setValue: React.Dispatch<React.SetStateAction<string>>,
+  ) => {
+    if (!ref) {
+      setValue((prev: string) => prev + snippet);
+      return;
+    }
+    const start = ref.selectionStart ?? ref.value.length;
+    const end = ref.selectionEnd ?? ref.value.length;
+    const next = ref.value.slice(0, start) + snippet + ref.value.slice(end);
+    setValue(next);
+    setTimeout(() => {
+      ref.focus();
+      const pos = start + snippet.length;
+      try {
+        ref.setSelectionRange(pos, pos);
+      } catch {}
+    }, 0);
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    // reset so selecting the same file twice still triggers onChange
+    e.target.value = "";
+    if (!f) return;
+
+    try {
+      if (!user) {
+        toast.error("로그인이 필요합니다.");
+        return;
+      }
+      const path = `${user.id}/problems/${Date.now()}_${f.name}`;
+      const { error: upErr } = await supabase.storage
+        .from("problem-assets")
+        .upload(path, f, { upsert: true, contentType: f.type });
+
+      if (upErr) {
+        toast.error(
+          `이미지 업로드 실패: ${upErr.message ?? "알 수 없는 오류"}`,
+        );
+        return;
+      }
+
+      const { data: pub } = supabase.storage
+        .from("problem-assets")
+        .getPublicUrl(path);
+
+      const url = pub?.publicUrl ?? "";
+      if (!url) {
+        toast.error("공개 URL을 가져오지 못했습니다.");
+        return;
+      }
+
+      const snippet = `![image](${url})`;
+      if (imageTarget === "description") {
+        insertAtCursor(
+          descriptionRef.current as HTMLTextAreaElement | null,
+          snippet,
+          setDescription,
+        );
+      } else if (imageTarget === "input") {
+        insertAtCursor(
+          inputDescRef.current as HTMLTextAreaElement | null,
+          snippet,
+          setInputDescription,
+        );
+      } else if (imageTarget === "output") {
+        insertAtCursor(
+          outputDescRef.current as HTMLTextAreaElement | null,
+          snippet,
+          setOutputDescription,
+        );
+      }
+      // remember this image to link with the problem on save
+      setUploadedImages((prev) => [
+        ...prev,
+        {
+          path,
+          url,
+          section: imageTarget as "description" | "input" | "output",
+        },
+      ]);
+      setImageTarget(null);
+      toast.success("이미지를 삽입했습니다.");
+    } catch {
+      toast.error("이미지 업로드 중 오류가 발생했습니다.");
+    }
+  };
 
   // inline validation state (immediate guidance)
   type FieldErrors = {
@@ -625,10 +780,6 @@ int main(void) {
     if (!Array.isArray(availableLanguages) || availableLanguages.length === 0)
       e.availableLanguages = "최소 1개 언어를 선택하세요.";
     if (!grade) e.grade = "난이도를 선택하세요.";
-    if (!conditions.every((c) => c.trim() !== ""))
-      e.conditions = "모든 조건이 비어있지 않아야 합니다.";
-    if (!examplePairs.every((p) => (p.output ?? "").trim() !== ""))
-      e.examples = "모든 예시 출력이 비어있지 않아야 합니다.";
     if (hasDeadline && (!deadline || !isValidDate(deadline)))
       e.deadline = "유효한 마감 기한을 입력하세요.";
     return e;
@@ -653,6 +804,24 @@ int main(void) {
 
   return (
     <div className="relative min-h-screen flex flex-col justify-between">
+      <Head>
+        <style>{`
+          /* Hide KaTeX's MathML layer to prevent duplicate visible text,
+             keep it accessible for screen readers. */
+          .katex .katex-mathml {
+            position: absolute !important;
+            display: none !important; /* prevent duplicate visible text */
+            overflow: hidden !important;
+            clip: rect(1px, 1px, 1px, 1px) !important;
+            height: 1px !important;
+            width: 1px !important;
+            padding: 0 !important;
+            border: 0 !important;
+            white-space: nowrap !important;
+          }
+          .katex .katex-html { position: relative; }
+        `}</style>
+      </Head>
       <div className="flex flex-col justify-center gap-8 p-6">
         {isEditing && (
           <div className="mb-2 rounded-md border border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-950 p-3 text-sm">
@@ -690,24 +859,83 @@ int main(void) {
           <h1 className="text-2xl font-bold flex items-center gap-1">
             문제 설명 <span className="text-red-500">*</span>
           </h1>
-          <textarea
-            ref={descriptionRef}
-            className={`w-full p-3 border rounded-md bg-white dark:bg-gray-800 text-black dark:text-white shadow-sm focus:outline-none focus:ring-2 transition duration-200 resize-none min-h-[150px] ${
-              touched.description && errors.description
-                ? "border-red-500 focus:ring-red-500 focus:border-red-500"
-                : "border-gray-300 dark:border-gray-600 focus:ring-blue-500 focus:border-blue-500"
-            }`}
-            placeholder="문제에 대한 설명을 입력하세요"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            onBlur={() => setTouched((t) => ({ ...t, description: true }))}
-            aria-invalid={touched.description && !!errors.description}
-            aria-describedby={
-              touched.description && errors.description
-                ? "error-description"
-                : undefined
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => openImagePicker("description")}
+              className="px-3 py-1 rounded-md border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 text-sm"
+            >
+              이미지 업로드
+            </button>
+            <span className="text-xs text-gray-500 dark:text-gray-400">
+              이미지: <code>![설명](url)</code> · 수식: <code>$M_{"{n}"}</code>,{" "}
+              <code>$$ ... $$</code>
+            </span>
+          </div>
+          <div className="text-xs text-gray-500 dark:text-gray-400">
+            LaTeX: <code>$...$</code>, <code>$$...$$</code>
+          </div>
+          <div
+            className={
+              splitDesc && previewDesc
+                ? "grid grid-cols-1 md:grid-cols-2 gap-3"
+                : "flex flex-col gap-2"
             }
-          />
+          >
+            <textarea
+              ref={descriptionRef}
+              className={`w-full p-3 border rounded-md bg-white dark:bg-gray-800 text-black dark:text-white shadow-sm focus:outline-none focus:ring-2 transition duration-200 resize-none ${
+                splitDesc && previewDesc ? "min-h-[260px]" : "min-h-[150px]"
+              } ${
+                touched.description && errors.description
+                  ? "border-red-500 focus:ring-red-500 focus:border-red-500"
+                  : "border-gray-300 dark:border-gray-600 focus:ring-blue-500 focus:border-blue-500"
+              }`}
+              placeholder="문제에 대한 설명을 입력하세요"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              onBlur={() => setTouched((t) => ({ ...t, description: true }))}
+              aria-invalid={touched.description && !!errors.description}
+              aria-describedby={
+                touched.description && errors.description
+                  ? "error-description"
+                  : undefined
+              }
+            />
+
+            {previewDesc && (
+              <div className="p-4 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-slate-900/40 prose prose-base max-w-none leading-7 tracking-[0.005em] dark:prose-invert prose-headings:font-semibold prose-p:my-2 prose-li:my-1 prose-code:bg-black/10 dark:prose-code:bg-white/10 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded-md prose-pre:bg-black/5 dark:prose-pre:bg-slate-900/70 prose-pre:p-3 break-words whitespace-pre-wrap prose-pre:overflow-x-auto">
+                {mdReady ? (
+                  (() => {
+                    const RM = mdLibsRef.current!
+                      .ReactMarkdown as React.ComponentType<ReactMarkdownOptions>;
+                    const remarkPlugins: PluggableList = [
+                      mdLibsRef.current!.remarkGfm,
+                      mdLibsRef.current!.remarkMath,
+                    ];
+                    const rehypePlugins: PluggableList = [
+                      [mdLibsRef.current!.rehypeKatex, { output: "html" }],
+                    ];
+                    return (
+                      <RM
+                        remarkPlugins={remarkPlugins}
+                        rehypePlugins={rehypePlugins}
+                      >
+                        {normalizeMarkdown(description)}
+                      </RM>
+                    );
+                  })()
+                ) : (
+                  <div className="text-xs text-gray-500">
+                    미리보기를 사용하려면 패키지 설치가 필요합니다:{" "}
+                    <code>
+                      pnpm add react-markdown remark-math rehype-katex katex
+                    </code>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
           {touched.description && errors.description && (
             <p id="error-description" className="text-sm text-red-500">
               {errors.description}
@@ -794,9 +1022,10 @@ int main(void) {
           )}
         </div>
         <div className="flex flex-col gap-4">
-          <h1 className="text-2xl font-bold flex items-center gap-1">
-            조건 <span className="text-red-500">*</span>
-          </h1>
+          <h1 className="text-2xl font-bold flex items-center gap-1">조건</h1>
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            LaTeX: <code>$...$</code>, <code>$$...$$</code>
+          </p>
           <div className="flex gap-2 flex-wrap">
             {[">", "<", "≥", "≤"].map((symbol, idx) => (
               <button
@@ -858,64 +1087,87 @@ int main(void) {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
                 transition={{ duration: 0.2 }}
-                className="flex gap-2 items-center"
+                className="grid grid-cols-1 md:grid-cols-2 gap-3 items-start"
               >
-                <input
-                  ref={(el) => {
-                    if (index === 0) conditionsRef.current = el;
-                    conditionRefs.current[index] = el;
-                  }}
-                  onFocus={() => setActiveConditionIndex(index)}
-                  onClick={() => setActiveConditionIndex(index)}
-                  onKeyUp={() => setActiveConditionIndex(index)}
-                  onSelect={() => setActiveConditionIndex(index)}
-                  type="text"
-                  value={condition}
-                  onChange={(e) => {
-                    const newConditions = [...conditions];
-                    newConditions[index] = e.target.value;
-                    setConditions(newConditions);
-                  }}
-                  className="flex-grow p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-black dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200"
-                  placeholder={`조건 ${index + 1}`}
-                  onBlur={() => setTouched((t) => ({ ...t, conditions: true }))}
-                />
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (conditions.length <= 1) {
-                      toast.error("조건은 무조건 1개 있어야 합니다.", {
-                        position: "top-right",
-                        autoClose: 5000,
-                        hideProgressBar: false,
-                        closeOnClick: false,
-                        pauseOnHover: true,
-                        draggable: true,
-                        progress: undefined,
-                        theme: theme === "dark" ? "dark" : "light",
-                        transition: Bounce,
-                      });
-                      return;
+                {/* left: editor */}
+                <div className="flex gap-2 items-center min-w-0">
+                  <input
+                    ref={(el) => {
+                      if (index === 0) conditionsRef.current = el;
+                      conditionRefs.current[index] = el;
+                    }}
+                    onFocus={() => setActiveConditionIndex(index)}
+                    onClick={() => setActiveConditionIndex(index)}
+                    onKeyUp={() => setActiveConditionIndex(index)}
+                    onSelect={() => setActiveConditionIndex(index)}
+                    type="text"
+                    value={condition}
+                    onChange={(e) => {
+                      const newConditions = [...conditions];
+                      newConditions[index] = e.target.value;
+                      setConditions(newConditions);
+                    }}
+                    className="flex-1 min-w-0 p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-black dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200"
+                    placeholder={`조건 ${index + 1}`}
+                    onBlur={() =>
+                      setTouched((t) => ({ ...t, conditions: true }))
                     }
-                    setConditions((prev) => {
-                      const next = prev.filter((_, i) => i !== index);
-                      // adjust active index if needed
-                      setActiveConditionIndex((cur) => {
-                        if (cur === null) return cur;
-                        if (cur === index)
-                          return Math.min(index, next.length - 1);
-                        if (cur > index) return cur - 1;
-                        return cur;
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setConditions((prev) => {
+                        const next = prev.filter((_, i) => i !== index);
+                        setActiveConditionIndex((cur) => {
+                          if (cur === null) return cur;
+                          if (cur === index)
+                            return Math.min(index, next.length - 1);
+                          if (cur > index) return cur - 1;
+                          return cur;
+                        });
+                        conditionRefs.current.splice(index, 1);
+                        return next;
                       });
-                      // also clean up the ref slot
-                      conditionRefs.current.splice(index, 1);
-                      return next;
-                    });
-                  }}
-                  className="p-1 bg-red-500 hover:bg-red-600 text-white rounded transition"
-                >
-                  <X className="w-5 h-5" />
-                </button>
+                    }}
+                    className="flex-none p-1 bg-red-500 hover:bg-red-600 text-white rounded transition"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+                {/* right: live preview */}
+                <div className="p-3 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-slate-900/40 prose prose-base max-w-none leading-7 tracking-[0.005em] dark:prose-invert break-words whitespace-pre-wrap min-w-0">
+                  {mdReady ? (
+                    (() => {
+                      const RM = mdLibsRef.current!
+                        .ReactMarkdown as React.ComponentType<ReactMarkdownOptions>;
+                      const remarkPlugins: PluggableList = [
+                        mdLibsRef.current!.remarkGfm,
+                        mdLibsRef.current!.remarkMath,
+                      ];
+                      const rehypePlugins: PluggableList = [
+                        [mdLibsRef.current!.rehypeKatex, { output: "html" }],
+                      ];
+                      return (
+                        <RM
+                          remarkPlugins={remarkPlugins}
+                          rehypePlugins={rehypePlugins}
+                        >
+                          {normalizeMarkdown(
+                            condition ||
+                              "미리보기: 조건 수식을 이곳에 표시합니다.",
+                          )}
+                        </RM>
+                      );
+                    })()
+                  ) : (
+                    <div className="text-xs text-gray-500">
+                      미리보기를 사용하려면 패키지 설치가 필요합니다:{" "}
+                      <code>
+                        pnpm add react-markdown remark-math rehype-katex katex
+                      </code>
+                    </div>
+                  )}
+                </div>
               </motion.div>
             ))}
           </AnimatePresence>
@@ -936,24 +1188,86 @@ int main(void) {
           <h1 className="text-2xl font-bold flex items-center gap-1">
             입력 설명 <span className="text-red-500">*</span>
           </h1>
-          <textarea
-            ref={inputDescRef}
-            className={`w-full p-3 border rounded-md bg-white dark:bg-gray-800 text-black dark:text-white shadow-sm focus:outline-none focus:ring-2 transition duration-200 resize-none min-h-[150px] ${
-              touched.inputDescription && errors.inputDescription
-                ? "border-red-500 focus:ring-red-500 focus:border-red-500"
-                : "border-gray-300 dark:border-gray-600 focus:ring-blue-500 focus:border-blue-500"
-            }`}
-            placeholder="입력 형식에 대한 설명을 입력하세요"
-            value={inputDescription}
-            onChange={(e) => setInputDescription(e.target.value)}
-            onBlur={() => setTouched((t) => ({ ...t, inputDescription: true }))}
-            aria-invalid={touched.inputDescription && !!errors.inputDescription}
-            aria-describedby={
-              touched.inputDescription && errors.inputDescription
-                ? "error-inputDescription"
-                : undefined
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => openImagePicker("input")}
+              className="px-3 py-1 rounded-md border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 text-sm"
+            >
+              이미지 업로드
+            </button>
+            <span className="text-xs text-gray-500 dark:text-gray-400">
+              이미지: <code>![설명](url)</code> · 수식: <code>$M_{"{n}"}</code>,{" "}
+              <code>$$ ... $$</code>
+            </span>
+          </div>
+          <div className="text-xs text-gray-500 dark:text-gray-400">
+            LaTeX: <code>$...$</code>, <code>$$...$$</code>
+          </div>
+          <div
+            className={
+              splitInput && previewInput
+                ? "grid grid-cols-1 md:grid-cols-2 gap-3"
+                : "flex flex-col gap-2"
             }
-          />
+          >
+            <textarea
+              ref={inputDescRef}
+              className={`w-full p-3 border rounded-md bg-white dark:bg-gray-800 text-black dark:text-white shadow-sm focus:outline-none focus:ring-2 transition duration-200 resize-none ${
+                splitInput && previewInput ? "min-h-[260px]" : "min-h-[150px]"
+              } ${
+                touched.inputDescription && errors.inputDescription
+                  ? "border-red-500 focus:ring-red-500 focus:border-red-500"
+                  : "border-gray-300 dark:border-gray-600 focus:ring-blue-500 focus:border-blue-500"
+              }`}
+              placeholder="입력 형식에 대한 설명을 입력하세요"
+              value={inputDescription}
+              onChange={(e) => setInputDescription(e.target.value)}
+              onBlur={() =>
+                setTouched((t) => ({ ...t, inputDescription: true }))
+              }
+              aria-invalid={
+                touched.inputDescription && !!errors.inputDescription
+              }
+              aria-describedby={
+                touched.inputDescription && errors.inputDescription
+                  ? "error-inputDescription"
+                  : undefined
+              }
+            />
+            {previewInput && (
+              <div className="p-4 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-slate-900/40 prose prose-base max-w-none leading-7 tracking-[0.005em] dark:prose-invert prose-headings:font-semibold prose-p:my-2 prose-li:my-1 prose-code:bg-black/10 dark:prose-code:bg-white/10 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded-md prose-pre:bg-black/5 dark:prose-pre:bg-slate-900/70 prose-pre:p-3 break-words whitespace-pre-wrap prose-pre:overflow-x-auto">
+                {mdReady ? (
+                  (() => {
+                    const RM = mdLibsRef.current!
+                      .ReactMarkdown as React.ComponentType<ReactMarkdownOptions>;
+                    const remarkPlugins: PluggableList = [
+                      mdLibsRef.current!.remarkGfm,
+                      mdLibsRef.current!.remarkMath,
+                    ];
+                    const rehypePlugins: PluggableList = [
+                      [mdLibsRef.current!.rehypeKatex, { output: "html" }],
+                    ];
+                    return (
+                      <RM
+                        remarkPlugins={remarkPlugins}
+                        rehypePlugins={rehypePlugins}
+                      >
+                        {normalizeMarkdown(inputDescription)}
+                      </RM>
+                    );
+                  })()
+                ) : (
+                  <div className="text-xs text-gray-500">
+                    미리보기를 사용하려면 패키지 설치가 필요합니다:{" "}
+                    <code>
+                      pnpm add react-markdown remark-math rehype-katex katex
+                    </code>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
           {touched.inputDescription && errors.inputDescription && (
             <p id="error-inputDescription" className="text-sm text-red-500">
               {errors.inputDescription}
@@ -964,28 +1278,86 @@ int main(void) {
           <h1 className="text-2xl font-bold flex items-center gap-1">
             출력 설명 <span className="text-red-500">*</span>
           </h1>
-          <textarea
-            ref={outputDescRef}
-            className={`w-full p-3 border rounded-md bg-white dark:bg-gray-800 text-black dark:text-white shadow-sm focus:outline-none focus:ring-2 transition duration-200 resize-none min-h-[150px] ${
-              touched.outputDescription && errors.outputDescription
-                ? "border-red-500 focus:ring-red-500 focus:border-red-500"
-                : "border-gray-300 dark:border-gray-600 focus:ring-blue-500 focus:border-blue-500"
-            }`}
-            placeholder="출력 형식에 대한 설명을 입력하세요"
-            value={outputDescription}
-            onChange={(e) => setOutputDescription(e.target.value)}
-            onBlur={() =>
-              setTouched((t) => ({ ...t, outputDescription: true }))
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => openImagePicker("output")}
+              className="px-3 py-1 rounded-md border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 text-sm"
+            >
+              이미지 업로드
+            </button>
+            <span className="text-xs text-gray-500 dark:text-gray-400">
+              이미지: <code>![설명](url)</code> · 수식: <code>$M_{"{n}"}</code>,{" "}
+              <code>$$ ... $$</code>
+            </span>
+          </div>
+          <div className="text-xs text-gray-500 dark:text-gray-400">
+            LaTeX: <code>$...$</code>, <code>$$...$$</code>
+          </div>
+          <div
+            className={
+              splitOutput && previewOutput
+                ? "grid grid-cols-1 md:grid-cols-2 gap-3"
+                : "flex flex-col gap-2"
             }
-            aria-invalid={
-              touched.outputDescription && !!errors.outputDescription
-            }
-            aria-describedby={
-              touched.outputDescription && errors.outputDescription
-                ? "error-outputDescription"
-                : undefined
-            }
-          />
+          >
+            <textarea
+              ref={outputDescRef}
+              className={`w-full p-3 border rounded-md bg-white dark:bg-gray-800 text-black dark:text-white shadow-sm focus:outline-none focus:ring-2 transition duration-200 resize-none ${
+                splitOutput && previewOutput ? "min-h-[260px]" : "min-h-[150px]"
+              } ${
+                touched.outputDescription && errors.outputDescription
+                  ? "border-red-500 focus:ring-red-500 focus:border-red-500"
+                  : "border-gray-300 dark:border-gray-600 focus:ring-blue-500 focus:border-blue-500"
+              }`}
+              placeholder="출력 형식에 대한 설명을 입력하세요"
+              value={outputDescription}
+              onChange={(e) => setOutputDescription(e.target.value)}
+              onBlur={() =>
+                setTouched((t) => ({ ...t, outputDescription: true }))
+              }
+              aria-invalid={
+                touched.outputDescription && !!errors.outputDescription
+              }
+              aria-describedby={
+                touched.outputDescription && errors.outputDescription
+                  ? "error-outputDescription"
+                  : undefined
+              }
+            />
+            {previewOutput && (
+              <div className="p-4 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-slate-900/40 prose prose-base max-w-none leading-7 tracking-[0.005em] dark:prose-invert prose-headings:font-semibold prose-p:my-2 prose-li:my-1 prose-code:bg-black/10 dark:prose-code:bg-white/10 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded-md prose-pre:bg-black/5 dark:prose-pre:bg-slate-900/70 prose-pre:p-3 break-words whitespace-pre-wrap prose-pre:overflow-x-auto">
+                {mdReady ? (
+                  (() => {
+                    const RM = mdLibsRef.current!
+                      .ReactMarkdown as React.ComponentType<ReactMarkdownOptions>;
+                    const remarkPlugins: PluggableList = [
+                      mdLibsRef.current!.remarkGfm,
+                      mdLibsRef.current!.remarkMath,
+                    ];
+                    const rehypePlugins: PluggableList = [
+                      [mdLibsRef.current!.rehypeKatex, { output: "html" }],
+                    ];
+                    return (
+                      <RM
+                        remarkPlugins={remarkPlugins}
+                        rehypePlugins={rehypePlugins}
+                      >
+                        {normalizeMarkdown(outputDescription)}
+                      </RM>
+                    );
+                  })()
+                ) : (
+                  <div className="text-xs text-gray-500">
+                    미리보기를 사용하려면 패키지 설치가 필요합니다:{" "}
+                    <code>
+                      pnpm add react-markdown remark-math rehype-katex katex
+                    </code>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
           {touched.outputDescription && errors.outputDescription && (
             <p id="error-outputDescription" className="text-sm text-red-500">
               {errors.outputDescription}
@@ -1020,7 +1392,7 @@ int main(void) {
         </div>
         <div className="flex flex-col gap-4">
           <h1 className="text-2xl font-bold flex items-center gap-1">
-            예시 입/출력 <span className="text-red-500">*</span>
+            예시 입/출력
           </h1>
           <AnimatePresence>
             {examplePairs.map((pair, index) => (
@@ -1327,36 +1699,6 @@ int main(void) {
                 return;
               }
 
-              if (!conditions.every((c) => c.trim() !== "")) {
-                toast.error("모든 조건이 비어있지 않아야 합니다.", {
-                  position: "top-right",
-                  autoClose: 5000,
-                  hideProgressBar: false,
-                  closeOnClick: false,
-                  pauseOnHover: true,
-                  draggable: true,
-                  progress: undefined,
-                  theme: theme === "dark" ? "dark" : "light",
-                  transition: Bounce,
-                });
-                return;
-              }
-
-              if (!examplePairs.every((e) => e.output.trim() !== "")) {
-                toast.error("모든 예시 출력이 비어있지 않아야 합니다.", {
-                  position: "top-right",
-                  autoClose: 5000,
-                  hideProgressBar: false,
-                  closeOnClick: false,
-                  pauseOnHover: true,
-                  draggable: true,
-                  progress: undefined,
-                  theme: theme === "dark" ? "dark" : "light",
-                  transition: Bounce,
-                });
-                return;
-              }
-
               if (!isValidDate(publishedAt)) {
                 toast.error("유효한 날짜 및 시간을 입력하세요.", {
                   position: "top-right",
@@ -1430,6 +1772,22 @@ int main(void) {
                       transition: Bounce,
                     });
                   } else {
+                    if (editProblemId && uploadedImages.length > 0) {
+                      const rows = uploadedImages.map((img) => ({
+                        problem_id: editProblemId,
+                        url: img.url,
+                        path: img.path,
+                        section: img.section,
+                      }));
+                      const { error: assetsErr } = await supabase
+                        .from("problem_assets")
+                        .insert(rows);
+                      if (assetsErr) {
+                        toast.warn(
+                          `이미지 기록 저장 실패: ${assetsErr.message}`,
+                        );
+                      }
+                    }
                     toast.success("수정이 완료되었습니다.", {
                       position: "top-right",
                       autoClose: 1400,
@@ -1440,9 +1798,10 @@ int main(void) {
                     });
                   }
                 } else {
-                  const { error } = await supabase
+                  const { data: createdRows, error } = await supabase
                     .from("problems")
-                    .insert(payload);
+                    .insert(payload)
+                    .select("id");
                   if (error) {
                     toast.error("생성 중 오류가 발생했습니다.", {
                       position: "top-right",
@@ -1453,6 +1812,28 @@ int main(void) {
                       transition: Bounce,
                     });
                   } else {
+                    const createdId =
+                      Array.isArray(createdRows) && createdRows[0]?.id
+                        ? createdRows[0].id
+                        : null;
+                    // try to persist uploaded images if any
+                    if (createdId && uploadedImages.length > 0) {
+                      const rows = uploadedImages.map((img) => ({
+                        problem_id: createdId,
+                        url: img.url,
+                        path: img.path,
+                        section: img.section,
+                      }));
+                      const { error: assetsErr } = await supabase
+                        .from("problem_assets")
+                        .insert(rows);
+                      if (assetsErr) {
+                        // non-blocking warning
+                        toast.warn(
+                          `이미지 기록 저장 실패: ${assetsErr.message}`,
+                        );
+                      }
+                    }
                     toast.success("문제가 생성되었습니다.", {
                       position: "top-right",
                       autoClose: 1400,
@@ -1552,6 +1933,13 @@ int main(void) {
           </div>
         </div>
       )}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleFileChange}
+        className="hidden"
+      />
     </div>
   );
 };
