@@ -1,6 +1,7 @@
 "use client";
 
 import React, { JSX, useEffect, useRef, useState } from "react";
+import Image from "next/image";
 import { useTheme } from "next-themes";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 
@@ -841,9 +842,11 @@ const NewProblemPage = () => {
                   key={`${img.path}-${idx}`}
                   className="flex items-center gap-3 rounded-md border border-gray-200 dark:border-gray-700 p-2 bg-white dark:bg-gray-800"
                 >
-                  <img
+                  <Image
                     src={img.url}
                     alt="uploaded"
+                    width={64}
+                    height={64}
                     className="h-16 w-16 object-contain rounded"
                   />
                   <div className="min-w-0 flex-1">

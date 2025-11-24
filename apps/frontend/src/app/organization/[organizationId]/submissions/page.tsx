@@ -32,6 +32,7 @@ const SubmissionsPage: React.FC = () => {
   const [nicknames, setNicknames] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [refreshTick, setRefreshTick] = useState(0);
 
   // Filters (preload from query if present)
   const [selectedProblemId, setSelectedProblemId] = useState<number | "all">(
@@ -169,7 +170,42 @@ const SubmissionsPage: React.FC = () => {
     statusFilter,
     currentUserId,
     supabase,
+    refreshTick,
   ]);
+
+  useEffect(() => {
+    if (!orgId || Number.isNaN(orgId)) return;
+
+    const channel = supabase
+      .channel(`problem_submissions:org:${orgId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "problem_submissions",
+        },
+        (payload) => {
+          const row = (payload.new ?? payload.old) as Submission | null;
+
+          // If a specific problem is selected, ignore changes for other problems
+          if (
+            selectedProblemId !== "all" &&
+            row &&
+            row.problem_id !== Number(selectedProblemId)
+          ) {
+            return;
+          }
+
+          setRefreshTick((t) => t + 1);
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [orgId, selectedProblemId, supabase]);
 
   const problemTitleById = useMemo(() => {
     const map = new Map<number, string>();
