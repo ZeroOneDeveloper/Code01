@@ -1,19 +1,14 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import {
-  useParams,
-  usePathname,
-  useRouter,
-  useSearchParams,
-} from "next/navigation";
+import { useParams, usePathname, useSearchParams } from "next/navigation";
+import Link from "next/link";
 
 import { createClient } from "@lib/supabase/client";
 
 const ProblemTabs: React.FC = () => {
   const supabase = createClient();
   const { problemId } = useParams<{ problemId: string }>();
-  const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
@@ -85,10 +80,13 @@ const ProblemTabs: React.FC = () => {
           },
         ];
         return tabs.map((item, index) => (
-          <button
+          <Link
             key={index}
-            onClick={() => {
-              if (!item.disabled) router.push(item.href);
+            href={item.href}
+            onClick={(e) => {
+              if (item.disabled) {
+                e.preventDefault();
+              }
             }}
             title={item.disabled ? "마감되어 제출할 수 없습니다." : undefined}
             aria-disabled={item.disabled || undefined}
@@ -107,7 +105,7 @@ const ProblemTabs: React.FC = () => {
                 <span>마감</span>
               </span>
             )}
-          </button>
+          </Link>
         ));
       })()}
     </div>
