@@ -103,7 +103,7 @@ export default function Header() {
   };
 
   return (
-    <nav className="fixed top-0 w-full flex justify-between md:justify-around items-center px-8 md:px-0 py-8 z-50 transition-shadow backdrop-blur">
+    <nav className="w-full flex justify-between md:justify-around items-center px-8 md:px-0 py-8 z-50">
       <div className="w-6 block md:hidden" />
       <Link href="/" className="transition-all duration-500 ease-in-out">
         <LightLogo className="w-24 md:w-36 hidden dark:block" />

@@ -61,7 +61,7 @@ export default async function OrganizationManagementLayout({
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center py-44">
+    <div className="min-h-screen flex items-center justify-center">
       <div className="flex flex-col gap-8 md:w-1/2">
         <div className="flex flex-col gap-2 ">
           <h1 className="text-left text-4xl font-bold">{organization.name}</h1>

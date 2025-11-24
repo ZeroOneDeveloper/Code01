@@ -90,7 +90,7 @@ export default async function Home() {
 
   if (Object.keys(visibleProblems).length > 0) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center py-44 gap-8">
+      <div className="min-h-screen flex flex-col items-center justify-center gap-8">
         {Object.entries(visibleProblems).map(([orgId, group]) => (
           <div key={orgId} className="container mx-auto px-4">
             <div className="max-w-5xl mx-auto">
