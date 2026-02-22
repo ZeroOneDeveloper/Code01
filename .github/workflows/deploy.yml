@@ -22,6 +22,7 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    environment: production
     env:
       DEPLOY_REF: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.ref || github.ref_name }}
       DEPLOY_PATH: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.deploy_path || vars.DEPLOY_PATH }}
