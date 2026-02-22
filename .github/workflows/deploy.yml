@@ -30,6 +30,7 @@ jobs:
     steps:
       - name: Deploy over SSH
         env:
+          DEPLOY_SSH_PASSWORD: ${{ secrets.DEPLOY_SSH_PASSWORD }}
           DEPLOY_DOTENV: ${{ secrets.DEPLOY_DOTENV }}
         uses: appleboy/ssh-action@v1.2.0
         with:
@@ -37,7 +38,7 @@ jobs:
           port: 2222
           username: ChanwooSong
           password: ${{ secrets.DEPLOY_SSH_PASSWORD }}
-          envs: DEPLOY_REF,DEPLOY_PATH,DEPLOY_DOTENV
+          envs: DEPLOY_REF,DEPLOY_PATH,DEPLOY_DOTENV,DEPLOY_SSH_PASSWORD
           script_stop: true
           command_timeout: 30m
           script: |
@@ -57,4 +58,12 @@ jobs:
             git checkout "$REF_TO_DEPLOY"
             git pull --ff-only origin "$REF_TO_DEPLOY"
 
-            docker compose up -d --build
+            if command -v sudo >/dev/null 2>&1; then
+              if sudo -n true >/dev/null 2>&1; then
+                sudo docker compose up -d --build
+              else
+                printf '%s\n' "${DEPLOY_SSH_PASSWORD:-}" | sudo -S -p '' docker compose up -d --build
+              fi
+            else
+              docker compose up -d --build
+            fi
