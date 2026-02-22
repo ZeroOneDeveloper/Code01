@@ -30,7 +30,7 @@ export default function QuizDetailPage() {
     organizationId: string;
     quizId: string;
   }>();
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   const [loading, setLoading] = useState(true);
   const [quiz, setQuiz] = useState<QuizRow | null>(null);

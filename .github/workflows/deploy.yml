@@ -43,11 +43,15 @@ jobs:
           command_timeout: 30m
           script: |
             set -euo pipefail
+            trap 'echo "[deploy] failed at line ${LINENO}: ${BASH_COMMAND}" >&2' ERR
 
             PROJECT_DIR="${DEPLOY_PATH:-$HOME/Code01}"
             REF_TO_DEPLOY="${DEPLOY_REF:-main}"
+            COMPOSE_CMD=""
 
             cd "$PROJECT_DIR"
+            echo "[deploy] project dir: $PROJECT_DIR"
+            echo "[deploy] ref: $REF_TO_DEPLOY"
 
             if [ -n "${DEPLOY_DOTENV:-}" ]; then
               printf '%s' "$DEPLOY_DOTENV" > .env
@@ -58,12 +62,27 @@ jobs:
             git checkout "$REF_TO_DEPLOY"
             git pull --ff-only origin "$REF_TO_DEPLOY"
 
+            if docker compose version >/dev/null 2>&1; then
+              COMPOSE_CMD="docker compose"
+            elif command -v docker-compose >/dev/null 2>&1; then
+              COMPOSE_CMD="docker-compose"
+            else
+              echo "[deploy] docker compose command not found" >&2
+              exit 1
+            fi
+
+            echo "[deploy] compose: $COMPOSE_CMD"
+
             if command -v sudo >/dev/null 2>&1; then
               if sudo -n true >/dev/null 2>&1; then
-                sudo docker compose up -d --build
+                sudo sh -lc "$COMPOSE_CMD up -d --build"
               else
-                printf '%s\n' "${DEPLOY_SSH_PASSWORD:-}" | sudo -S -p '' docker compose up -d --build
+                if [ -z "${DEPLOY_SSH_PASSWORD:-}" ]; then
+                  echo "[deploy] DEPLOY_SSH_PASSWORD is empty" >&2
+                  exit 1
+                fi
+                printf '%s\n' "${DEPLOY_SSH_PASSWORD}" | sudo -S -k -p '' sh -lc "$COMPOSE_CMD up -d --build"
               fi
             else
-              docker compose up -d --build
+              sh -lc "$COMPOSE_CMD up -d --build"
             fi

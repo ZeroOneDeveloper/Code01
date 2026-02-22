@@ -2,9 +2,9 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { createClient } from "@lib/supabase/client";
-import { toast } from "react-toastify";
 import Link from "next/link";
+import { toast } from "react-toastify";
+import { createClient } from "@lib/supabase/client";
 
 type ProblemRow = {
   id: number;
@@ -14,64 +14,158 @@ type ProblemRow = {
   deadline?: string | null;
 };
 
-// 출제 방식:
-//  - one_for_all: 선택된 문제 전체를 모든 응시자에게 동일 배정
-//  - one_per_attempt: 선택된 문제들 중 응시 시점마다 n개를 무작위 배정
+type QuizRow = {
+  id: number | string;
+  organization_id: number;
+  title: string;
+  description: string | null;
+  assignment_mode?: "one_for_all" | "one_per_attempt" | "all" | string | null;
+  problem_count?: number | null;
+  global_problem_id?: number | null;
+  time_limit_sec: number;
+  start_at: string;
+  end_at: string;
+  published_at?: string | null;
+};
+
+type QuizProblemRow = {
+  problem_id: number;
+  order_index: number;
+};
+
 type AssignmentMode = "one_for_all" | "one_per_attempt";
 
-export default function NewQuizPage() {
-  const { organizationId } = useParams<{ organizationId: string }>(); // organization id
+export default function EditQuizPage() {
+  const { organizationId, quizId } = useParams<{
+    organizationId: string;
+    quizId: string;
+  }>();
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
 
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [quizFound, setQuizFound] = useState(true);
   const [problems, setProblems] = useState<ProblemRow[]>([]);
   const [search, setSearch] = useState("");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
-  const [submitting, setSubmitting] = useState(false);
 
-  // 시간/출제 설정
-  const [timeLimitMin, setTimeLimitMin] = useState<number>(30); // 제한 시간(분)
-  const [startLocal, setStartLocal] = useState<string>(() => {
-    const d = new Date();
-    d.setMinutes(d.getMinutes() + 5); // 기본: 5분 뒤 시작
-    return toLocalDatetimeValue(d);
-  });
-  const [endLocal, setEndLocal] = useState<string>(() => {
-    const d = new Date();
-    d.setMinutes(d.getMinutes() + 35); // 기본: 시작(+5분) 기준 약 30분 뒤 마감
-    return toLocalDatetimeValue(d);
-  });
-  const [publishedLocal, setPublishedLocal] = useState<string>(""); // 비공개 기본
+  const [timeLimitMin, setTimeLimitMin] = useState<number>(30);
+  const [startLocal, setStartLocal] = useState<string>("");
+  const [endLocal, setEndLocal] = useState<string>("");
+  const [publishedLocal, setPublishedLocal] = useState<string>("");
   const [assignmentMode, setAssignmentMode] =
     useState<AssignmentMode>("one_for_all");
   const [problemCount, setProblemCount] = useState<number>(1);
 
   useEffect(() => {
     const run = async () => {
-      try {
-        if (!organizationId) return;
-        const orgIdNum = Number(organizationId);
-        const { data, error } = await supabase
-          .from("problems")
-          .select("id, title, description, organization_id, deadline")
-          .eq("organization_id", orgIdNum)
-          .order("id", { ascending: true });
+      if (!organizationId || !quizId) {
+        setLoading(false);
+        return;
+      }
 
-        if (error) {
-          console.error(error);
+      setLoading(true);
+      try {
+        const orgIdNum = Number(organizationId);
+        const quizIdFilter = isUUID(quizId) ? quizId : Number(quizId);
+
+        const [{ data: problemsData, error: problemsError }, quizResult] =
+          await Promise.all([
+            supabase
+              .from("problems")
+              .select("id, title, description, organization_id, deadline")
+              .eq("organization_id", orgIdNum)
+              .order("id", { ascending: true }),
+            supabase
+              .from("quizzes")
+              .select("*")
+              .eq("id", quizIdFilter)
+              .eq("organization_id", orgIdNum)
+              .maybeSingle(),
+          ]);
+
+        if (problemsError) {
+          console.error(problemsError);
           toast.error("문제 목록을 불러오지 못했습니다.");
         } else {
-          setProblems(data || []);
+          setProblems((problemsData as ProblemRow[]) || []);
+        }
+
+        if (quizResult.error) {
+          console.error(quizResult.error);
+          toast.error("퀴즈 정보를 불러오지 못했습니다.");
+          setQuizFound(false);
+          return;
+        }
+
+        const quiz = quizResult.data as QuizRow | null;
+        if (!quiz) {
+          setQuizFound(false);
+          return;
+        }
+
+        setQuizFound(true);
+        setTitle(quiz.title ?? "");
+        setDescription(quiz.description ?? "");
+        setTimeLimitMin(Math.max(1, Math.floor((quiz.time_limit_sec ?? 1800) / 60)));
+        setStartLocal(toLocalDatetimeValue(new Date(quiz.start_at)));
+        setEndLocal(toLocalDatetimeValue(new Date(quiz.end_at)));
+        setPublishedLocal(
+          quiz.published_at ? toLocalDatetimeValue(new Date(quiz.published_at)) : "",
+        );
+
+        const normalizedMode = normalizeAssignmentMode(quiz.assignment_mode);
+        setAssignmentMode(normalizedMode);
+
+        const { data: quizProblemsData, error: quizProblemsError } = await supabase
+          .from("quiz_problems")
+          .select("problem_id, order_index")
+          .eq("quiz_id", quizIdFilter)
+          .order("order_index", { ascending: true });
+
+        if (quizProblemsError) {
+          console.error(quizProblemsError);
+          toast.error("퀴즈 문제 정보를 불러오지 못했습니다.");
+          return;
+        }
+
+        let problemRows = (quizProblemsData || []) as QuizProblemRow[];
+        if (problemRows.length === 0 && quiz.global_problem_id) {
+          problemRows = [{ problem_id: quiz.global_problem_id, order_index: 0 }];
+        }
+
+        const initialSelected = problemRows.map((row) => row.problem_id);
+        setSelectedIds(initialSelected);
+
+        const storedCount =
+          typeof quiz.problem_count === "number" && quiz.problem_count > 0
+            ? Math.floor(quiz.problem_count)
+            : 1;
+        if (normalizedMode === "one_per_attempt") {
+          const upper = Math.max(1, initialSelected.length);
+          setProblemCount(Math.min(Math.max(1, storedCount), upper));
+        } else {
+          setProblemCount(storedCount);
         }
       } finally {
         setLoading(false);
       }
     };
+
     run();
-  }, [organizationId, supabase]);
+  }, [organizationId, quizId, supabase]);
+
+  useEffect(() => {
+    if (assignmentMode !== "one_per_attempt") return;
+    const upper = Math.max(1, selectedIds.length);
+    setProblemCount((prev) => {
+      const normalized = Number.isFinite(prev) ? Math.floor(prev) : 1;
+      return Math.min(Math.max(1, normalized), upper);
+    });
+  }, [assignmentMode, selectedIds.length]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -90,12 +184,10 @@ export default function NewQuizPage() {
 
   const handleToggleSelectAll = () => {
     if (allSelected) {
-      // 기존 동작을 유지: 모두 해제
       setSelectedIds([]);
-    } else {
-      // 현재 필터 결과 전체를 선택
-      setSelectedIds(filtered.map((p) => p.id));
+      return;
     }
+    setSelectedIds(filtered.map((p) => p.id));
   };
 
   const toggleSelect = (pid: number) => {
@@ -104,7 +196,9 @@ export default function NewQuizPage() {
     );
   };
 
-  const handleCreate = async () => {
+  const handleSave = async () => {
+    if (!organizationId || !quizId) return;
+
     if (!title.trim()) {
       toast.error("퀴즈 제목을 입력하세요.");
       return;
@@ -138,6 +232,7 @@ export default function NewQuizPage() {
     const publishedDate = publishedLocal
       ? parseLocalDatetime(publishedLocal)
       : new Date();
+
     if (!startDate || !endDate) {
       toast.error("시작/마감 시간을 올바르게 입력하세요.");
       return;
@@ -147,34 +242,12 @@ export default function NewQuizPage() {
       return;
     }
 
-    if (!organizationId) return;
-
-    setSubmitting(true);
+    setSaving(true);
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) {
-        toast.error("로그인이 필요합니다.");
-        return;
-      }
-
       const orgIdNum = Number(organizationId);
+      const quizIdFilter = isUUID(quizId) ? quizId : Number(quizId);
 
-      // payload 구성
-      const payload: {
-        organization_id: number;
-        title: string;
-        description: string | null;
-        time_limit_sec: number;
-        start_at: string;
-        end_at: string;
-        published_at: string; // 공개 시각 (비워두면 즉시 공개 => now)
-        assignment_mode: AssignmentMode;
-        problem_count: number;
-        created_by: string; // user id
-      } = {
-        organization_id: orgIdNum,
+      const payload = {
         title: title.trim(),
         description: description.trim() || null,
         time_limit_sec: timeLimitMin * 60,
@@ -184,76 +257,97 @@ export default function NewQuizPage() {
         assignment_mode: assignmentMode,
         problem_count:
           assignmentMode === "one_for_all" ? selectedIds.length : requestedCount,
-        created_by: user.id,
+        global_problem_id: null,
       };
 
-      // quizzes insert
-      const { data: quiz, error: qErr } = await supabase
+      const { error: updateQuizError } = await supabase
         .from("quizzes")
-        .insert(payload)
-        .select("id")
-        .single();
+        .update(payload)
+        .eq("id", quizIdFilter)
+        .eq("organization_id", orgIdNum);
 
-      if (qErr || !quiz) {
-        console.error(qErr);
-        toast.error("퀴즈 생성에 실패했습니다.");
+      if (updateQuizError) {
+        console.error(updateQuizError);
+        toast.error("퀴즈 수정에 실패했습니다.");
         return;
       }
 
-      const quizProblemIds = selectedIds;
+      const { error: deleteQuizProblemsError } = await supabase
+        .from("quiz_problems")
+        .delete()
+        .eq("quiz_id", quizIdFilter);
 
-      const rows = quizProblemIds.map((pid, i) => ({
-        quiz_id: quiz.id,
+      if (deleteQuizProblemsError) {
+        console.error(deleteQuizProblemsError);
+        toast.error("기존 퀴즈 문제 삭제에 실패했습니다.");
+        return;
+      }
+
+      const rows = selectedIds.map((pid, idx) => ({
+        quiz_id: quizIdFilter,
         problem_id: pid,
-        order_index: i,
+        order_index: idx,
       }));
-      const { error: qpErr } = await supabase.from("quiz_problems").insert(rows);
-      if (qpErr) {
-        console.error(qpErr);
+
+      const { error: insertQuizProblemsError } = await supabase
+        .from("quiz_problems")
+        .insert(rows);
+
+      if (insertQuizProblemsError) {
+        console.error(insertQuizProblemsError);
         toast.error("퀴즈 문제 저장에 실패했습니다.");
         return;
       }
 
-      toast.success(
-        <div className="flex items-center gap-2">
-          <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-green-600 text-white text-[10px] leading-none">
-            ✓
-          </span>
-          <div className="flex flex-col text-left">
-            <span className="font-medium">퀴즈 생성 완료</span>
-            <span className="text-xs opacity-70">문제 풀 저장 완료</span>
-          </div>
-        </div>,
-        {
-          icon: false,
-          autoClose: 1400,
-          closeButton: false,
-          hideProgressBar: true,
-          position: "bottom-right",
-          className:
-            "rounded-md border border-green-200 dark:border-green-900/40 shadow-sm py-2",
-        },
-      );
-
-      router.replace(`/organization/${organizationId}/quizzes`);
+      toast.success("퀴즈가 수정되었습니다.");
+      router.replace(`/organization/${organizationId}/quizzes/${quizId}`);
     } finally {
-      setSubmitting(false);
+      setSaving(false);
     }
   };
 
-  return (
-    <div className="max-w-6xl mx-auto p-4 space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">퀴즈 생성</h1>
+  if (loading) {
+    return (
+      <div className="max-w-6xl mx-auto p-4">
+        <div className="rounded-md border p-4 text-sm text-center">불러오는 중…</div>
+      </div>
+    );
+  }
+
+  if (!quizFound) {
+    return (
+      <div className="max-w-6xl mx-auto p-4 space-y-4 text-center">
+        <div className="text-sm">퀴즈를 찾을 수 없습니다.</div>
         <Link
           href={`/organization/${organizationId}/quizzes`}
-          className="text-sm underline underline-offset-4"
+          className="underline underline-offset-4 text-sm"
         >
           퀴즈 목록
         </Link>
       </div>
+    );
+  }
 
-      {/* 기본 정보 */}
+  return (
+    <div className="max-w-6xl mx-auto p-4 space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-semibold">퀴즈 편집</h1>
+        <div className="flex items-center gap-3">
+          <Link
+            href={`/organization/${organizationId}/quizzes/${quizId}`}
+            className="text-sm underline underline-offset-4"
+          >
+            퀴즈 상세
+          </Link>
+          <Link
+            href={`/organization/${organizationId}/quizzes`}
+            className="text-sm underline underline-offset-4"
+          >
+            퀴즈 목록
+          </Link>
+        </div>
+      </div>
+
       <div className="rounded-md border p-4 space-y-3">
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           <label className="space-y-1">
@@ -278,7 +372,6 @@ export default function NewQuizPage() {
         </label>
       </div>
 
-      {/* 시간/출제 설정 */}
       <div className="rounded-md border p-4 space-y-3">
         <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
           <label className="space-y-1">
@@ -322,6 +415,7 @@ export default function NewQuizPage() {
             </span>
           </label>
         </div>
+
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           <fieldset className="space-y-2">
             <legend className="text-sm font-medium">출제 방식</legend>
@@ -343,6 +437,7 @@ export default function NewQuizPage() {
               />
               <span>응시마다 무작위 문제 (선택된 목록에서 랜덤)</span>
             </label>
+
             {assignmentMode === "one_per_attempt" && (
               <label className="flex items-center gap-2 text-sm mt-2">
                 <span className="text-muted-foreground">문제 개수 (n)</span>
@@ -361,6 +456,7 @@ export default function NewQuizPage() {
                 </span>
               </label>
             )}
+
             {assignmentMode === "one_for_all" && (
               <p className="text-xs text-muted-foreground mt-1">
                 * 선택한 문제 <strong>전체</strong>가 모든 응시자에게 동일하게
@@ -380,7 +476,6 @@ export default function NewQuizPage() {
         </p>
       </div>
 
-      {/* 문제 선택 */}
       <div className="rounded-md border p-4 space-y-3">
         <div className="flex flex-wrap items-center gap-2">
           <input
@@ -406,11 +501,7 @@ export default function NewQuizPage() {
               문제 목록 ({filtered.length})
             </div>
             <div className="max-h-[380px] overflow-auto divide-y">
-              {loading ? (
-                <div className="p-3 text-sm text-muted-foreground">
-                  불러오는 중…
-                </div>
-              ) : filtered.length === 0 ? (
+              {filtered.length === 0 ? (
                 <div className="p-3 text-sm text-muted-foreground">
                   결과가 없습니다.
                 </div>
@@ -494,19 +585,23 @@ export default function NewQuizPage() {
           취소
         </button>
         <button
-          onClick={handleCreate}
-          disabled={submitting}
+          onClick={handleSave}
+          disabled={saving}
           className="rounded-md border px-3 py-2 text-sm disabled:opacity-50"
         >
-          {submitting ? "생성 중…" : "퀴즈 생성"}
+          {saving ? "저장 중…" : "변경사항 저장"}
         </button>
       </div>
     </div>
   );
 }
 
-/** helpers */
+function normalizeAssignmentMode(mode: QuizRow["assignment_mode"]): AssignmentMode {
+  return mode === "one_per_attempt" ? "one_per_attempt" : "one_for_all";
+}
+
 function toLocalDatetimeValue(d: Date) {
+  if (Number.isNaN(d.getTime())) return "";
   const pad = (n: number) => `${n}`.padStart(2, "0");
   const yyyy = d.getFullYear();
   const mm = pad(d.getMonth() + 1);
@@ -515,8 +610,15 @@ function toLocalDatetimeValue(d: Date) {
   const mi = pad(d.getMinutes());
   return `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
 }
+
 function parseLocalDatetime(v: string): Date | null {
   if (!v) return null;
   const d = new Date(v);
   return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function isUUID(s: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    s,
+  );
 }

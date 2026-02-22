@@ -27,7 +27,7 @@ type QuizRow = {
 export default function QuizzesIndexPage() {
   const { organizationId } = useParams<{ organizationId: string }>();
   const router = useRouter();
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<QuizRow[]>([]);

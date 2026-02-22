@@ -446,7 +446,7 @@ async def list_problems(
     return [problem_to_dict(problem) for problem in rows.scalars().all()]
 
 
-def _is_problem_published(published_at: datetime | None, now: datetime) -> bool:
+def _is_published(published_at: datetime | None, now: datetime) -> bool:
     if published_at is None:
         return False
     target = (
@@ -499,7 +499,7 @@ async def list_visible_problems(
     visible_problems: list[Problem] = []
     for problem in all_problems:
         org_id = problem.organization_id
-        published = _is_problem_published(problem.published_at, now)
+        published = _is_published(problem.published_at, now)
 
         if org_id is None:
             if published:
@@ -595,12 +595,53 @@ async def list_visible_problems(
         )
     )
 
+    upcoming_quizzes: list[dict] = []
+    if viewer_user_id is not None and member_org_ids:
+        quiz_rows = await db.execute(
+            select(Quiz)
+            .where(Quiz.organization_id.in_(member_org_ids))
+            .order_by(Quiz.start_at.asc(), Quiz.id.asc())
+        )
+        all_member_quizzes = quiz_rows.scalars().all()
+
+        for quiz in all_member_quizzes:
+            if quiz.start_at is None:
+                continue
+            quiz_start = (
+                quiz.start_at
+                if quiz.start_at.tzinfo is not None
+                else quiz.start_at.replace(tzinfo=timezone.utc)
+            )
+            if quiz_start <= now:
+                continue
+            if not _is_published(quiz.published_at, now):
+                continue
+
+            org = organizations.get(quiz.organization_id)
+            upcoming_quizzes.append(
+                {
+                    "id": quiz.id,
+                    "organization_id": quiz.organization_id,
+                    "organization_name": org["name"]
+                    if org
+                    else f"Organization #{quiz.organization_id}",
+                    "title": quiz.title,
+                    "description": quiz.description,
+                    "start_at": dt(quiz.start_at),
+                    "end_at": dt(quiz.end_at),
+                    "time_limit_sec": quiz.time_limit_sec,
+                    "assignment_mode": quiz.assignment_mode,
+                    "problem_count": quiz.problem_count,
+                }
+            )
+
     return {
         "viewer": {
             "authenticated": viewer_user_id is not None,
             "user_id": str(viewer_user_id) if viewer_user_id is not None else None,
         },
         "total": len(visible_problems),
+        "upcoming_quizzes": upcoming_quizzes[:16],
         "sections": sections,
     }
 
