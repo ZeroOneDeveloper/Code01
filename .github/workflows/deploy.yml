@@ -40,14 +40,28 @@ jobs:
           password: ${{ secrets.DEPLOY_SSH_PASSWORD }}
           envs: DEPLOY_REF,DEPLOY_PATH,DEPLOY_DOTENV,DEPLOY_SSH_PASSWORD
           script_stop: true
+          request_pty: true
           command_timeout: 30m
           script: |
-            set -euo pipefail
-            trap 'echo "[deploy] failed at line ${LINENO}: ${BASH_COMMAND}" >&2' ERR
+            bash -se <<'BASH'
+            set -Eeuo pipefail
+            trap 'rc=$?; echo "[deploy] failed (exit ${rc}) at line ${LINENO}: ${BASH_COMMAND}" >&2; exit ${rc}' ERR
 
             PROJECT_DIR="${DEPLOY_PATH:-$HOME/Code01}"
             REF_TO_DEPLOY="${DEPLOY_REF:-main}"
             COMPOSE_CMD=""
+            SUDO_MODE="none"
+
+            run_privileged() {
+              local cmd="$1"
+              if [ "$SUDO_MODE" = "none" ]; then
+                sh -lc "$cmd"
+              elif [ "$SUDO_MODE" = "nopass" ]; then
+                sudo -n sh -lc "$cmd"
+              else
+                printf '%s\n' "${DEPLOY_SSH_PASSWORD}" | sudo -S -k -p '' sh -lc "$cmd"
+              fi
+            }
 
             cd "$PROJECT_DIR"
             echo "[deploy] project dir: $PROJECT_DIR"
@@ -67,22 +81,27 @@ jobs:
             elif command -v docker-compose >/dev/null 2>&1; then
               COMPOSE_CMD="docker-compose"
             else
-              echo "[deploy] docker compose command not found" >&2
+              echo "[deploy] docker compose command not found for current user" >&2
               exit 1
             fi
 
-            echo "[deploy] compose: $COMPOSE_CMD"
-
             if command -v sudo >/dev/null 2>&1; then
               if sudo -n true >/dev/null 2>&1; then
-                sudo sh -lc "$COMPOSE_CMD up -d --build"
+                SUDO_MODE="nopass"
               else
                 if [ -z "${DEPLOY_SSH_PASSWORD:-}" ]; then
                   echo "[deploy] DEPLOY_SSH_PASSWORD is empty" >&2
                   exit 1
                 fi
-                printf '%s\n' "${DEPLOY_SSH_PASSWORD}" | sudo -S -k -p '' sh -lc "$COMPOSE_CMD up -d --build"
+                SUDO_MODE="password"
               fi
-            else
-              sh -lc "$COMPOSE_CMD up -d --build"
             fi
+
+            echo "[deploy] compose: $COMPOSE_CMD"
+            echo "[deploy] sudo mode: $SUDO_MODE"
+
+            run_privileged "whoami"
+            run_privileged "docker --version"
+            run_privileged "$COMPOSE_CMD version"
+            run_privileged "$COMPOSE_CMD up -d --build"
+            BASH
