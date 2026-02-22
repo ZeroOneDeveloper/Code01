@@ -43,7 +43,6 @@ jobs:
           request_pty: true
           command_timeout: 30m
           script: |
-            /usr/bin/env bash <<'BASH'
             set -euxo pipefail
 
             PROJECT_DIR="${DEPLOY_PATH:-$HOME/Code01}"
@@ -53,23 +52,11 @@ jobs:
             echo "[deploy] project dir: $PROJECT_DIR"
             echo "[deploy] ref: $REF_TO_DEPLOY"
 
-            if [[ -n "${DEPLOY_DOTENV:-}" ]]; then
-              printf '%s' "$DEPLOY_DOTENV" > .env
-              chmod 600 .env
-            fi
+            printf '%s' "${DEPLOY_DOTENV}" > .env
+            chmod 600 .env
 
             git fetch --all --prune
             git checkout "$REF_TO_DEPLOY"
             git pull --ff-only origin "$REF_TO_DEPLOY"
 
-            if [[ -z "${DEPLOY_SSH_PASSWORD:-}" ]]; then
-              echo "[deploy] DEPLOY_SSH_PASSWORD is empty" >&2
-              exit 1
-            fi
-
-            if sudo -n true >/dev/null 2>&1; then
-              sudo bash -lc "set -eux; whoami; docker --version; docker compose version; cd '$PROJECT_DIR'; docker compose up -d --build"
-            else
-              printf '%s\n' "${DEPLOY_SSH_PASSWORD}" | sudo -S -k -p '' bash -lc "set -eux; whoami; docker --version; docker compose version; cd '$PROJECT_DIR'; docker compose up -d --build"
-            fi
-            BASH
+            printf '%s\n' "${DEPLOY_SSH_PASSWORD}" | sudo -S -k -p '' bash -lc "set -eux; whoami; docker --version; docker compose version; cd '$PROJECT_DIR'; docker compose up -d --build"
