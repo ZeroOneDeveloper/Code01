@@ -4,11 +4,11 @@ import React, { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
-import { User } from "@supabase/auth-js";
 import { CircleUserRound, Menu } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 
 import { UserProfile } from "@lib/types";
+import type { User } from "@lib/supabase/types";
 import ThemeToggle from "@components/ThemeToggle";
 import { DarkLogo, LightLogo } from "@components/Logo";
 import { createClient } from "@lib/supabase/client";
@@ -103,7 +103,7 @@ export default function Header() {
   };
 
   return (
-    <nav className="w-full flex justify-between md:justify-around items-center px-8 md:px-0 py-8 z-50">
+    <nav className="w-full flex justify-between md:justify-around items-center px-8 md:px-0 py-8 z-50 bg-white dark:bg-dark">
       <div className="w-6 block md:hidden" />
       <Link href="/" className="transition-all duration-500 ease-in-out">
         <LightLogo className="w-24 md:w-36 hidden dark:block" />

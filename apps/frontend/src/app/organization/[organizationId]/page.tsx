@@ -5,11 +5,11 @@ import { useParams } from "next/navigation";
 import { useTheme } from "next-themes";
 
 import { Bounce, toast } from "react-toastify";
-import { User as UserType } from "@supabase/auth-js";
 import { ShieldUser, User, UserMinus, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 import { Organization } from "@lib/types";
+import type { User as UserType } from "@lib/supabase/types";
 import { createClient } from "@lib/supabase/client";
 
 const OrganizationManagementPage: React.FC = () => {
@@ -42,7 +42,12 @@ const OrganizationManagementPage: React.FC = () => {
       console.error("Error fetching members:", error);
     } else {
       const membersWithProfiles = await Promise.all(
-        membersData.map(async (member) => {
+        (membersData ?? []).map(
+          async (member: {
+            user_id: string;
+            role: "admin" | "member";
+            joined_at: string;
+          }) => {
           const userId = member.user_id;
           const { data: userProfile, error: profileError } = await supabase
             .from("users")

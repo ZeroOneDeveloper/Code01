@@ -1,10 +1,11 @@
 from fastapi import APIRouter, BackgroundTasks
-
-import os
 from pydantic import BaseModel
-from supabase import acreate_client, AsyncClient
 
-from .func import load_generate_function, generate_unique_cases
+from .func import (
+    generate_unique_cases,
+    load_generate_function,
+    validate_generate_function,
+)
 
 
 class GenerateRequest(BaseModel):
@@ -25,30 +26,16 @@ router = APIRouter(
 async def generate_testcases(
     payload: GenerateRequest, background_tasks: BackgroundTasks
 ):
-    supabase: AsyncClient = await acreate_client(
-        os.getenv("SUPABASE_URL"),
-        os.getenv("SUPABASE_PUBLISHABLE_KEY"),
-    )
-
     try:
         generate_func = load_generate_function(payload.code, payload.base_seed)
-        print(
-            await generate_unique_cases(
-                supabase=supabase,
-                generate_func=generate_func,
-                problem_id=payload.problem_id,
-                count=1,
-                base_seed=payload.base_seed,
-            )
-        )
-    except ValueError as e:
-        return {"error": str(e)}
-    except Exception as e:
-        return {"error": f"테스트 케이스 생성 중 오류 발생: {e}"}
+        validate_generate_function(generate_func, payload.base_seed)
+    except ValueError as exc:
+        return {"error": str(exc)}
+    except Exception as exc:
+        return {"error": f"테스트 케이스 생성 중 오류 발생: {exc}"}
 
     background_tasks.add_task(
         generate_unique_cases,
-        supabase,
         generate_func,
         int(payload.problem_id),
         int(payload.count),

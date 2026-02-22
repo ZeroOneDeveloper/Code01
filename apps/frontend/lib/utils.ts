@@ -2,12 +2,11 @@ import { UserProfile } from "@lib/types";
 import { createClient } from "@lib/supabase/server";
 
 export const hasEnvVars =
-  process.env.NEXT_PUBLIC_SUPABASE_URL &&
-  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  process.env.NEXT_PUBLIC_API_URL;
 
 export const getUserData = async (userId: string): Promise<UserProfile> => {
   if (!hasEnvVars) {
-    throw new Error("Supabase environment variables are not set.");
+    throw new Error("API environment variable is not set.");
   }
 
   const supabase = await createClient();

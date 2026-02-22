@@ -4,6 +4,9 @@
 *.env
 *.env.local
 *.env.development
+.env
+**/.env
+**/.env.*
 
 **/__pycache__/
 

@@ -1,0 +1,58 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Deploy target branch or tag"
+        required: true
+        default: "main"
+      deploy_path:
+        description: "Remote project path"
+        required: true
+        default: "~/Code01"
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      DEPLOY_REF: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.ref || github.ref_name }}
+      DEPLOY_PATH: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.deploy_path || vars.DEPLOY_PATH }}
+    steps:
+      - name: Deploy over SSH
+        env:
+          DEPLOY_DOTENV: ${{ secrets.DEPLOY_DOTENV }}
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ssh.zero0ne.dev
+          port: 2222
+          username: ChanwooSong
+          password: ${{ secrets.DEPLOY_SSH_PASSWORD }}
+          envs: DEPLOY_REF,DEPLOY_PATH,DEPLOY_DOTENV
+          script_stop: true
+          command_timeout: 30m
+          script: |
+            set -euo pipefail
+
+            PROJECT_DIR="${DEPLOY_PATH:-$HOME/Code01}"
+            REF_TO_DEPLOY="${DEPLOY_REF:-main}"
+
+            cd "$PROJECT_DIR"
+
+            if [ -n "${DEPLOY_DOTENV:-}" ]; then
+              printf '%s' "$DEPLOY_DOTENV" > .env
+              chmod 600 .env
+            fi
+
+            git fetch --all --prune
+            git checkout "$REF_TO_DEPLOY"
+            git pull --ff-only origin "$REF_TO_DEPLOY"
+
+            docker compose up -d --build

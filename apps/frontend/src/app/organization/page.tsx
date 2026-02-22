@@ -10,7 +10,7 @@ const OrganizationPage = async () => {
 
   if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="flex flex-1 items-center justify-center">
         <div className="flex flex-col gap-4 md:w-1/2">
           <h1 className="text-left text-4xl font-bold">Unauthorized</h1>
           <p>You must be logged in to view this page.</p>
@@ -25,7 +25,9 @@ const OrganizationPage = async () => {
     .eq("user_id", user.id)
     .eq("role", "admin");
 
-  const adminOrgIds = adminOrgs?.map((m) => m.organization_id) ?? [];
+  const adminOrgIds =
+    (adminOrgs ?? []).map((m: { organization_id: number }) => m.organization_id) ??
+    [];
 
   const { data: organizations, error } = await supabase
     .from("organizations")
@@ -34,7 +36,7 @@ const OrganizationPage = async () => {
       [
         `created_by.eq.${user.id}`,
         adminOrgIds.length > 0
-          ? `id.in.(${adminOrgIds.map((id) => `"${id}"`).join(",")})`
+          ? `id.in.(${adminOrgIds.map((id: number) => `"${id}"`).join(",")})`
           : null,
       ]
         .filter(Boolean)
@@ -44,7 +46,7 @@ const OrganizationPage = async () => {
   if (error) {
     console.error(error);
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="flex flex-1 items-center justify-center">
         <div className="flex flex-col gap-4 md:w-1/2">
           <h1 className="text-left text-4xl font-bold">Error</h1>
           <p>{error.message}</p>
@@ -54,7 +56,8 @@ const OrganizationPage = async () => {
   }
 
   const orgsWithCounts = await Promise.all(
-    (organizations ?? []).map(async (org) => {
+    (organizations ?? []).map(
+      async (org: { id: number; name: string; is_private: boolean }) => {
       const { count } = await supabase
         .from("organization_members")
         .select("*", { count: "exact", head: true })
@@ -64,7 +67,7 @@ const OrganizationPage = async () => {
   );
 
   return (
-    <div className="min-h-screen flex justify-center pt-24">
+    <div className="w-full flex justify-center pt-8 pb-8">
       <div className="flex flex-col gap-8 md:w-1/2">
         <div className="flex flex-col gap-2 ">
           <h1 className="text-left text-4xl font-bold">Organizations</h1>

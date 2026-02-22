@@ -26,7 +26,7 @@ const normalizeMarkdown = (s?: string) =>
 
 const NotFoundProblem: React.FC = () => {
   return (
-    <div className="min-h-screen flex items-center justify-center">
+    <div className="flex flex-1 items-center justify-center">
       <h1 className="text-2xl font-bold">문제를 찾을 수 없습니다.</h1>
     </div>
   );
@@ -64,14 +64,16 @@ const ProblemPage: React.FC<{
     .from("problem_submissions")
     .select("user_id, passed_all")
     .eq("problem_id", problem.id);
+  const submissionRows = (submissionsData ?? []) as {
+    user_id: string;
+    passed_all: boolean;
+  }[];
 
-  const submission_count = submissionsData?.length ?? 0;
-  const correct_count =
-    submissionsData?.filter((s) => s.passed_all)?.length ?? 0;
-  const user_count = submissionsData
-    ? new Set(submissionsData.filter((s) => s.passed_all).map((s) => s.user_id))
-        .size
-    : 0;
+  const submission_count = submissionRows.length;
+  const correct_count = submissionRows.filter((s) => s.passed_all).length;
+  const user_count = new Set(
+    submissionRows.filter((s) => s.passed_all).map((s) => s.user_id),
+  ).size;
   const correct_rate =
     submission_count === 0
       ? "0%"

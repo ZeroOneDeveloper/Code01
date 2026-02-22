@@ -12,6 +12,7 @@ type QuizRow = {
   title: string;
   description: string | null;
   assignment_mode?: "one_for_all" | "one_per_attempt" | "all" | string;
+  problem_count?: number | null;
   global_problem_id?: number | null;
   time_limit_sec: number;
   start_at: string;
@@ -68,42 +69,33 @@ export default function QuizDetailPage() {
         }
         setQuiz(q as QuizRow);
 
-        // Load problem(s)
-        if (
-          q.assignment_mode === "one_for_all" ||
-          q.assignment_mode === "all"
-        ) {
-          if (q.global_problem_id) {
-            const { data: p } = await supabase
-              .from("problems")
-              .select("id, title")
-              .eq("id", q.global_problem_id)
-              .single();
-            if (p) setProblemTitles({ [p.id]: p.title });
-          }
-          setQuizProblems([]);
-        } else {
-          const { data: qp } = await supabase
-            .from("quiz_problems")
-            .select("problem_id, order_index")
-            .eq("quiz_id", quizId)
-            .order("order_index", { ascending: true });
+        // Load selected/pool problems for every mode.
+        const { data: qp } = await supabase
+          .from("quiz_problems")
+          .select("problem_id, order_index")
+          .eq("quiz_id", quizIdFilter)
+          .order("order_index", { ascending: true });
 
-          console.log(qp);
-
-          const ids = (qp || []).map((x) => x.problem_id);
-          if (ids.length) {
-            const { data: plist } = await supabase
-              .from("problems")
-              .select("id, title")
-              .in("id", ids);
-            const map = Object.fromEntries(
-              (plist || []).map((p: ProblemRow) => [p.id, p.title]),
-            );
-            setProblemTitles(map);
-          }
-          setQuizProblems((qp || []) as QuizProblemRow[]);
+        let problemRows = (qp || []) as QuizProblemRow[];
+        if (problemRows.length === 0 && q.global_problem_id) {
+          // Backward compatibility for old one_for_all quizzes.
+          problemRows = [{ problem_id: q.global_problem_id, order_index: 0 }];
         }
+
+        const ids = problemRows.map((x) => x.problem_id);
+        if (ids.length) {
+          const { data: plist } = await supabase
+            .from("problems")
+            .select("id, title")
+            .in("id", ids);
+          const map = Object.fromEntries(
+            (plist || []).map((p: ProblemRow) => [p.id, p.title]),
+          );
+          setProblemTitles(map);
+        } else {
+          setProblemTitles({});
+        }
+        setQuizProblems(problemRows);
       } finally {
         setLoading(false);
       }
@@ -154,6 +146,13 @@ export default function QuizDetailPage() {
             <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs border">
               {modeLabel(quiz.assignment_mode)}
             </span>
+            {quiz.assignment_mode === "one_per_attempt" &&
+              typeof quiz.problem_count === "number" &&
+              quiz.problem_count > 0 && (
+                <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs border">
+                  n = {quiz.problem_count}
+                </span>
+              )}
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -197,74 +196,60 @@ export default function QuizDetailPage() {
           <h2 className="text-sm font-semibold">문제</h2>
           {quiz.assignment_mode === "one_per_attempt" && (
             <div className="text-xs text-muted-foreground">
-              응시마다 선택된 풀에서 무작위 1문제가 배정됩니다.
+              응시마다 선택된 풀에서 무작위로 {quiz.problem_count ?? 1}개가
+              배정됩니다.
+            </div>
+          )}
+          {quiz.assignment_mode === "all" && (
+            <div className="text-xs text-muted-foreground">
+              선택된 모든 문제가 포함된 기존 모드 퀴즈입니다.
+            </div>
+          )}
+          {quiz.assignment_mode === "one_for_all" && (
+            <div className="text-xs text-muted-foreground">
+              모든 응시자에게 선택한 문제 전체({quiz.problem_count ?? 0}개)가
+              동일하게 배정됩니다.
             </div>
           )}
         </div>
 
-        {quiz.assignment_mode === "one_for_all" ||
-        quiz.assignment_mode === "all" ? (
-          quiz.global_problem_id ? (
-            <div className="rounded-md border divide-y">
-              <div className="flex items-center justify-between p-3">
-                <div className="text-sm font-medium">
-                  문제 #{quiz.global_problem_id}{" "}
-                  {problemTitles[quiz.global_problem_id]
-                    ? `— ${problemTitles[quiz.global_problem_id]}`
-                    : ""}
-                </div>
-                <Link
-                  href={`/organization/1/problems/new?id=${quiz.global_problem_id}`}
-                  className="rounded-md border px-2 py-1 text-xs"
-                >
-                  문제 보기
-                </Link>
-              </div>
-            </div>
-          ) : (
-            <div className="text-sm text-muted-foreground">
-              지정된 문제가 없습니다.
-            </div>
-          )
-        ) : (
-          <div className="rounded-md border">
-            <div className="border-b px-3 py-2 text-sm font-medium">
-              선택된 문제 ({quizProblems.length})
-            </div>
-            <div className="max-h-[420px] overflow-auto divide-y">
-              {quizProblems.length === 0 ? (
-                <div className="p-3 text-sm text-muted-foreground">
-                  등록된 문제가 없습니다.
-                </div>
-              ) : (
-                quizProblems.map((row, idx) => (
-                  <div
-                    key={`${row.problem_id}-${idx}`}
-                    className="flex items-start gap-3 p-3"
-                  >
-                    <span className="text-xs rounded-full border px-2 py-0.5">
-                      {idx + 1}
-                    </span>
-                    <div className="flex-1">
-                      <div className="text-sm font-medium">
-                        #{row.problem_id}{" "}
-                        {problemTitles[row.problem_id]
-                          ? `— ${problemTitles[row.problem_id]}`
-                          : ""}
-                      </div>
-                    </div>
-                    <Link
-                      href={`/organization/${organizationId}/problems/new?id=${row.problem_id}`}
-                      className="rounded-md border px-2 py-1 text-xs"
-                    >
-                      문제 보기
-                    </Link>
-                  </div>
-                ))
-              )}
-            </div>
+        <div className="rounded-md border">
+          <div className="border-b px-3 py-2 text-sm font-medium">
+            선택된 문제 ({quizProblems.length})
           </div>
-        )}
+          <div className="max-h-[420px] overflow-auto divide-y">
+            {quizProblems.length === 0 ? (
+              <div className="p-3 text-sm text-muted-foreground">
+                등록된 문제가 없습니다.
+              </div>
+            ) : (
+              quizProblems.map((row, idx) => (
+                <div
+                  key={`${row.problem_id}-${idx}`}
+                  className="flex items-start gap-3 p-3"
+                >
+                  <span className="text-xs rounded-full border px-2 py-0.5">
+                    {idx + 1}
+                  </span>
+                  <div className="flex-1">
+                    <div className="text-sm font-medium">
+                      #{row.problem_id}{" "}
+                      {problemTitles[row.problem_id]
+                        ? `— ${problemTitles[row.problem_id]}`
+                        : ""}
+                    </div>
+                  </div>
+                  <Link
+                    href={`/problem/${row.problem_id}`}
+                    className="rounded-md border px-2 py-1 text-xs"
+                  >
+                    문제 보기
+                  </Link>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -301,8 +286,9 @@ function statusBadge(s: "upcoming" | "active" | "ended") {
 }
 
 function modeLabel(m?: string) {
-  if (m === "one_for_all" || m === "all") return "전체 동일 1문제";
-  return "응시마다 랜덤 1문제";
+  if (m === "one_for_all") return "전체 동일(전체 선택)";
+  if (m === "all") return "전체 풀이(기존)";
+  return "응시마다 무작위";
 }
 
 function fmtTimeLimit(sec: number) {

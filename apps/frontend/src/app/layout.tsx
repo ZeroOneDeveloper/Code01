@@ -20,11 +20,13 @@ export default function RootLayout({
 }>) {
   return (
     <html suppressHydrationWarning>
-      <body className="dark:bg-dark bg-white transition-colors duration-500 ease-in-out text-black dark:text-white">
+      <body className="min-h-screen dark:bg-dark bg-white transition-colors duration-500 ease-in-out text-black dark:text-white">
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          <Header />
-          {children}
-          <Footer />
+          <div className="min-h-screen flex flex-col">
+            <Header />
+            <div className="flex-1 flex flex-col">{children}</div>
+            <Footer />
+          </div>
           <ToastContainer />
         </ThemeProvider>
       </body>

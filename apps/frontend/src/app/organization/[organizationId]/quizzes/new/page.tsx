@@ -14,9 +14,9 @@ type ProblemRow = {
   deadline?: string | null;
 };
 
-// 출제 방식: 전원 같은 1문제 / 응시마다 무작위 1문제
-//  - one_for_all: 퀴즈에 지정된 단일 문제(global_problem_id)만 출제
-//  - one_per_attempt: 선택된 문제들 중 응시 시점에 1개 무작위로 배정
+// 출제 방식:
+//  - one_for_all: 선택된 문제 전체를 모든 응시자에게 동일 배정
+//  - one_per_attempt: 선택된 문제들 중 응시 시점마다 n개를 무작위 배정
 type AssignmentMode = "one_for_all" | "one_per_attempt";
 
 export default function NewQuizPage() {
@@ -41,12 +41,13 @@ export default function NewQuizPage() {
   });
   const [endLocal, setEndLocal] = useState<string>(() => {
     const d = new Date();
-    d.setDate(d.getDate() + 7); // 기본: 7일 뒤 마감
+    d.setMinutes(d.getMinutes() + 35); // 기본: 시작(+5분) 기준 약 30분 뒤 마감
     return toLocalDatetimeValue(d);
   });
   const [publishedLocal, setPublishedLocal] = useState<string>(""); // 비공개 기본
   const [assignmentMode, setAssignmentMode] =
-    useState<AssignmentMode>("one_per_attempt");
+    useState<AssignmentMode>("one_for_all");
+  const [problemCount, setProblemCount] = useState<number>(1);
 
   useEffect(() => {
     const run = async () => {
@@ -113,6 +114,20 @@ export default function NewQuizPage() {
       return;
     }
 
+    const requestedCount = Math.floor(problemCount);
+    if (assignmentMode === "one_per_attempt") {
+      if (!Number.isFinite(requestedCount) || requestedCount < 1) {
+        toast.error("문제 개수(n)는 1 이상이어야 합니다.");
+        return;
+      }
+      if (requestedCount > selectedIds.length) {
+        toast.error(
+          `문제 개수(n=${requestedCount})는 선택한 문제 수(${selectedIds.length})를 넘을 수 없습니다.`,
+        );
+        return;
+      }
+    }
+
     if (timeLimitMin < 1) {
       toast.error("제한 시간(분)은 1 이상이어야 합니다.");
       return;
@@ -156,8 +171,8 @@ export default function NewQuizPage() {
         end_at: string;
         published_at: string; // 공개 시각 (비워두면 즉시 공개 => now)
         assignment_mode: AssignmentMode;
+        problem_count: number;
         created_by: string; // user id
-        global_problem_id?: number; // only for one_for_all mode
       } = {
         organization_id: orgIdNum,
         title: title.trim(),
@@ -167,13 +182,10 @@ export default function NewQuizPage() {
         end_at: endDate.toISOString(),
         published_at: (publishedDate as Date).toISOString(),
         assignment_mode: assignmentMode,
+        problem_count:
+          assignmentMode === "one_for_all" ? selectedIds.length : requestedCount,
         created_by: user.id,
       };
-
-      if (assignmentMode === "one_for_all") {
-        payload.global_problem_id =
-          selectedIds[Math.floor(Math.random() * selectedIds.length)];
-      }
 
       // quizzes insert
       const { data: quiz, error: qErr } = await supabase
@@ -188,21 +200,18 @@ export default function NewQuizPage() {
         return;
       }
 
-      // 문제 매핑: one_per_attempt일 때만 저장 (응시 시 무작위 추출 용)
-      if (assignmentMode === "one_per_attempt") {
-        const rows = selectedIds.map((pid, i) => ({
-          quiz_id: quiz.id,
-          problem_id: pid,
-          order_index: i,
-        }));
-        const { error: qpErr } = await supabase
-          .from("quiz_problems")
-          .insert(rows);
-        if (qpErr) {
-          console.error(qpErr);
-          toast.error("퀴즈 문제 저장에 실패했습니다.");
-          return;
-        }
+      const quizProblemIds = selectedIds;
+
+      const rows = quizProblemIds.map((pid, i) => ({
+        quiz_id: quiz.id,
+        problem_id: pid,
+        order_index: i,
+      }));
+      const { error: qpErr } = await supabase.from("quiz_problems").insert(rows);
+      if (qpErr) {
+        console.error(qpErr);
+        toast.error("퀴즈 문제 저장에 실패했습니다.");
+        return;
       }
 
       toast.success(
@@ -323,7 +332,7 @@ export default function NewQuizPage() {
                 checked={assignmentMode === "one_for_all"}
                 onChange={() => setAssignmentMode("one_for_all")}
               />
-              <span>전원 같은 1문제 (지정된 1문제만 출제)</span>
+              <span>전원 동일 문제 (선택한 문제 전체)</span>
             </label>
             <label className="flex items-center gap-2 text-sm">
               <input
@@ -332,12 +341,36 @@ export default function NewQuizPage() {
                 checked={assignmentMode === "one_per_attempt"}
                 onChange={() => setAssignmentMode("one_per_attempt")}
               />
-              <span>응시마다 무작위 1문제 (선택된 목록에서 랜덤)</span>
+              <span>응시마다 무작위 문제 (선택된 목록에서 랜덤)</span>
             </label>
+            {assignmentMode === "one_per_attempt" && (
+              <label className="flex items-center gap-2 text-sm mt-2">
+                <span className="text-muted-foreground">문제 개수 (n)</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={Math.max(1, selectedIds.length)}
+                  className="w-24 rounded-md border bg-transparent px-2 py-1 text-sm"
+                  value={problemCount}
+                  onChange={(e) =>
+                    setProblemCount(Number.parseInt(e.target.value || "1", 10))
+                  }
+                />
+                <span className="text-xs text-muted-foreground">
+                  (선택됨 {selectedIds.length}개)
+                </span>
+              </label>
+            )}
             {assignmentMode === "one_for_all" && (
               <p className="text-xs text-muted-foreground mt-1">
-                * 선택한 문제들 중 <strong>임의의 1개</strong>가 모든 응시자에게
+                * 선택한 문제 <strong>전체</strong>가 모든 응시자에게 동일하게
                 배정됩니다.
+              </p>
+            )}
+            {assignmentMode === "one_per_attempt" && (
+              <p className="text-xs text-muted-foreground mt-1">
+                * 각 응시 시작 시 선택된 문제 풀에서 <strong>무작위로 n개</strong>
+                를 배정합니다.
               </p>
             )}
           </fieldset>

@@ -1,4 +1,23 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: code01-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-code01}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB:-code01}
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-code01} -d ${POSTGRES_DB:-code01}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./apps/backend/sql/001_init.sql:/docker-entrypoint-initdb.d/001_init.sql:ro
+
   piston:
     image: ghcr.io/engineer-man/piston
     container_name: code01-piston
@@ -19,13 +38,21 @@ services:
       dockerfile: Dockerfile
     image: code01-backend:latest
     container_name: code01-backend
+    env_file:
+      - ./.env
     depends_on:
-      - piston
+      piston:
+        condition: service_started
+      postgres:
+        condition: service_healthy
     ports:
       - "3001:3001"
     environment:
       - PYTHONUNBUFFERED=1
       - PISTON_API_URL=http://piston:2000
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-code01}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-code01}
+      - STORAGE_DIR=/app/uploads
+      - BACKEND_PUBLIC_ORIGIN=${BACKEND_PUBLIC_ORIGIN:-http://localhost:3001}
     cap_add:
       - SYS_ADMIN
     security_opt:
@@ -36,6 +63,7 @@ services:
     volumes:
       - piston-data:/piston
       - isolate-data:/app/isolate
+      - uploads-data:/app/uploads
     privileged: true
     restart: unless-stopped
 
@@ -51,8 +79,12 @@ services:
       - "3000:3000"
     environment:
       - NEXT_TELEMETRY_DISABLED=1
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:3001}
+      - INTERNAL_API_URL=http://backend:3001
     restart: unless-stopped
 
 volumes:
+  postgres-data:
   piston-data:
   isolate-data:
+  uploads-data:

@@ -5,7 +5,7 @@ import { createClient } from "@lib/supabase/server";
 
 const NotFoundProblem: React.FC = () => {
   return (
-    <div className="min-h-screen flex items-center justify-center">
+    <div className="flex flex-1 items-center justify-center">
       <h1 className="text-2xl font-bold">문제를 찾을 수 없습니다.</h1>
     </div>
   );
@@ -34,7 +34,7 @@ export default async function ProblemPageLayout({
   }
 
   return (
-    <div className="min-h-screen flex justify-center pt-24">
+    <div className="w-full flex justify-center pt-8 pb-8">
       <div className="flex flex-col gap-8 w-5/6 md:w-3/5 2xl:w-2/5 mx-auto">
         <ProblemTabs />
         {children}

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 
 import { Submission, toStatusKo } from "@lib/types";
-import type { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
+import type { RealtimePostgresChangesPayload } from "@lib/supabase/types";
 import { createClient } from "@lib/supabase/client";
 
 const labels = [
@@ -88,7 +88,8 @@ const SubmissionsPage: React.FC = () => {
       if (error) {
         console.error("Error fetching submissions:", error);
       } else {
-        const userIds = data.map((s) => s.user_id);
+        const rows = (data ?? []) as SubmissionRow[];
+        const userIds = rows.map((s) => s.user_id);
         const { data: userProfiles, error: userError } = await supabase
           .from("users")
           .select("id, nickname")
@@ -98,11 +99,16 @@ const SubmissionsPage: React.FC = () => {
         }
         setNicknames(
           Object.fromEntries(
-            userProfiles?.map((user) => [user.id, user.nickname]) || [],
+            userProfiles?.map(
+              (user: { id: string; nickname: string | null }) => [
+                user.id,
+                user.nickname ?? "",
+              ],
+            ) || [],
           ),
         );
         setSubmissions(
-          data.filter(
+          rows.filter(
             (s) =>
               s.visibility === "public" ||
               (s.visibility === "correct" && s.is_correct) ||

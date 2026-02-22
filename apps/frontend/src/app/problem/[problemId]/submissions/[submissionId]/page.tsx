@@ -3,11 +3,11 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { useParams } from "next/navigation";
 
-import { User } from "@supabase/auth-js";
 import Editor from "@monaco-editor/react";
 import Link from "next/link";
 
 import { createClient } from "@lib/supabase/client";
+import type { User } from "@lib/supabase/types";
 import { Problem, Submission, UserProfile, toStatusKo } from "@lib/types";
 import { Bounce, toast } from "react-toastify";
 import { useTheme } from "next-themes";

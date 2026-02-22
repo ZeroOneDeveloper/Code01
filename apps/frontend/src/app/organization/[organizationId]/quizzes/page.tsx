@@ -13,6 +13,7 @@ type QuizRow = {
   title: string;
   description: string | null;
   assignment_mode?: "one_for_all" | "one_per_attempt" | "all" | string;
+  problem_count?: number | null;
   global_problem_id?: number | null;
   time_limit_sec: number;
   start_at: string;
@@ -259,13 +260,22 @@ function statusBadge(s: "upcoming" | "active" | "ended") {
 }
 
 function modeLabel(m?: string) {
-  if (m === "one_for_all" || m === "all") return "전체 동일 1문제";
-  return "응시마다 랜덤 1문제";
+  if (m === "one_for_all") return "전체 동일(전체 선택)";
+  if (m === "all") return "전체 풀이(기존)";
+  return "응시마다 무작위";
 }
 
 function problemInfo(q: QuizRow) {
-  if (q.assignment_mode === "one_for_all" || q.assignment_mode === "all") {
-    return q.global_problem_id ? `문제 #${q.global_problem_id}` : "문제 1개";
+  const count = q.problem_count ?? null;
+  if (q.assignment_mode === "one_for_all") {
+    if (typeof count === "number" && count > 0) {
+      return `전체 ${count}개`;
+    }
+    return q.global_problem_id ? `문제 #${q.global_problem_id}` : "문제 미지정";
+  }
+  if (q.assignment_mode === "all") return "선택 문제 전체(기존)";
+  if (typeof count === "number" && count > 0) {
+    return `랜덤 ${count}개`;
   }
   return "지정 풀에서 무작위";
 }

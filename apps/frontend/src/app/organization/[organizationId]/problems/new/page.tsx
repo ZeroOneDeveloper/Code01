@@ -7,7 +7,6 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 
 import { X, CalendarClock, Tags } from "lucide-react";
 import Editor from "@monaco-editor/react";
-import { User } from "@supabase/auth-js";
 import { motion, AnimatePresence } from "framer-motion";
 import { Bounce, toast } from "react-toastify";
 import { FaJava } from "react-icons/fa";
@@ -16,6 +15,7 @@ import { PiStarFourFill } from "react-icons/pi"; // expert
 import { BsGraphUpArrow, BsGraphDownArrow, BsEmojiSmile } from "react-icons/bs"; // intermediate
 
 import type { Language, Problem } from "@lib/types";
+import type { User } from "@lib/supabase/types";
 import { createClient } from "@lib/supabase/client";
 import Head from "next/head";
 import "katex/dist/katex.min.css";
@@ -803,7 +803,7 @@ const NewProblemPage = () => {
   ]);
 
   return (
-    <div className="relative min-h-screen flex flex-col justify-between">
+    <div className="relative flex flex-1 flex-col justify-between">
       <Head>
         <style>{`
           /* Hide KaTeX's MathML layer to prevent duplicate visible text,

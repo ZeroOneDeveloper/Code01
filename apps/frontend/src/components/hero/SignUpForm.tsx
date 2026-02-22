@@ -28,6 +28,9 @@ const notifyError = (message: string) => {
 const SignUpForm = () => {
   const router = useRouter();
 
+  const [studentId, setStudentId] = React.useState("");
+  const [fullName, setFullName] = React.useState("");
+  const [nickname, setNickname] = React.useState("");
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [confirmPassword, setConfirmPassword] = React.useState("");
@@ -40,6 +43,34 @@ const SignUpForm = () => {
 
     if (isSubmitting) return;
 
+    const normalizedStudentId = studentId.trim();
+    const normalizedFullName = fullName.trim();
+    const normalizedNickname = nickname.trim();
+
+    if (!normalizedStudentId) {
+      notifyError("학번을 입력해 주세요.");
+      return;
+    }
+    if (normalizedStudentId.length > 64) {
+      notifyError("학번은 64자 이하여야 합니다.");
+      return;
+    }
+    if (!normalizedFullName) {
+      notifyError("이름을 입력해 주세요.");
+      return;
+    }
+    if (normalizedFullName.length > 80) {
+      notifyError("이름은 80자 이하여야 합니다.");
+      return;
+    }
+    if (!normalizedNickname) {
+      notifyError("닉네임을 입력해 주세요.");
+      return;
+    }
+    if (normalizedNickname.length > 40) {
+      notifyError("닉네임은 40자 이하여야 합니다.");
+      return;
+    }
     if (!isValidEmail(email)) {
       notifyError("이메일 형식이 올바르지 않습니다.");
       return;
@@ -64,12 +95,17 @@ const SignUpForm = () => {
         password,
         options: {
           emailRedirectTo: `${window.location.origin}/login`,
+          data: {
+            student_id: normalizedStudentId,
+            name: normalizedFullName,
+            nickname: normalizedNickname,
+          },
         },
       });
 
       if (error) {
         console.log(error);
-        notifyError("이메일/비밀번호를 확인해주세요.");
+        notifyError(error.message ?? "회원가입을 완료하지 못했습니다.");
         return;
       }
 
@@ -82,9 +118,39 @@ const SignUpForm = () => {
   return (
     <form
       onSubmit={handleSubmit}
-      className="w-5/6 md:w-2/5 2xl:w-1/6 shadow-md p-8 rounded-lg text-center flex flex-col gap-4 border-2 border-gray-700/40"
+      className="w-5/6 md:w-2/5 2xl:w-1/4 shadow-md p-8 rounded-lg text-center flex flex-col gap-4 border-2 border-gray-700/40"
     >
       <h1 className="text-2xl font-black">Sign Up</h1>
+      <div className="flex flex-col">
+        <label className="text-left font-medium py-2">Student ID</label>
+        <input
+          className="w-full dark:bg-[#28282d] text-black dark:text-white px-4 py-2 shadow-md rounded-lg border-2 border-gray-200 dark:border-gray-400/30 focus:outline-none dark:focus:border-gray-300 transition-colors"
+          type="text"
+          value={studentId}
+          placeholder="Enter your student ID"
+          onChange={(e) => setStudentId(e.target.value)}
+        />
+      </div>
+      <div className="flex flex-col">
+        <label className="text-left font-medium py-2">Full Name</label>
+        <input
+          className="w-full dark:bg-[#28282d] text-black dark:text-white px-4 py-2 shadow-md rounded-lg border-2 border-gray-200 dark:border-gray-400/30 focus:outline-none dark:focus:border-gray-300 transition-colors"
+          type="text"
+          value={fullName}
+          placeholder="Enter your name"
+          onChange={(e) => setFullName(e.target.value)}
+        />
+      </div>
+      <div className="flex flex-col">
+        <label className="text-left font-medium py-2">Nickname</label>
+        <input
+          className="w-full dark:bg-[#28282d] text-black dark:text-white px-4 py-2 shadow-md rounded-lg border-2 border-gray-200 dark:border-gray-400/30 focus:outline-none dark:focus:border-gray-300 transition-colors"
+          type="text"
+          value={nickname}
+          placeholder="Enter your nickname"
+          onChange={(e) => setNickname(e.target.value)}
+        />
+      </div>
       <div className="flex flex-col">
         <label className="text-left font-medium py-2">Email address</label>
         <input

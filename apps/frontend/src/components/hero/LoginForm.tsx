@@ -12,7 +12,10 @@ import { createClient } from "@lib/supabase/client";
 const LoginForm = () => {
   const router = useRouter();
   const { theme } = useTheme();
-  const code = useSearchParams().get("code");
+  const searchParams = useSearchParams();
+  const code = searchParams.get("code");
+  const resetStatus = searchParams.get("reset");
+  const hasShownResetToastRef = React.useRef(false);
 
   const supabase = createClient();
 
@@ -26,6 +29,22 @@ const LoginForm = () => {
       }
     });
   }, [code, supabase, router]);
+
+  useEffect(() => {
+    if (resetStatus !== "success" || hasShownResetToastRef.current) return;
+    hasShownResetToastRef.current = true;
+    toast.success("비밀번호가 재설정되었습니다. 새 비밀번호로 로그인해 주세요.", {
+      position: "top-right",
+      autoClose: 4000,
+      hideProgressBar: false,
+      closeOnClick: false,
+      pauseOnHover: true,
+      draggable: true,
+      progress: undefined,
+      theme: theme === "dark" ? "dark" : "light",
+      transition: Bounce,
+    });
+  }, [resetStatus, theme]);
 
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
@@ -89,6 +108,11 @@ const LoginForm = () => {
           placeholder="Enter your password"
           onChange={(e) => setPassword(e.target.value)}
         />
+      </div>
+      <div className="text-right text-sm text-gray-500">
+        <Link href="/reset-password" className="underline">
+          비밀번호를 잊으셨나요?
+        </Link>
       </div>
       <button
         type="submit"

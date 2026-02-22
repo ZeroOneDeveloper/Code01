@@ -23,6 +23,10 @@ Code01은 프로그래밍 문제를 만들고, 관리하며, 사용자들이 코
   - **Language**: Python
   - **Framework**: FastAPI
 
+- **Database**:
+  - **Engine**: PostgreSQL
+  - **Access**: SQLAlchemy (asyncpg)
+
 - **Code Execution Engine**:
   - **Engine**: Piston
   - **Environment**: Docker
@@ -41,7 +45,7 @@ Docker와 Docker Compose가 설치되어 있어야 합니다.
     ```
 
 2.  **애플리케이션 실행**
-    아래 명령어는 `frontend`, `backend`, `piston` 서비스의 Docker 이미지를 빌드하고 컨테이너를 실행합니다.
+    아래 명령어는 `frontend`, `backend`, `postgres`, `piston` 서비스를 실행합니다.
 
     ```bash
     docker-compose up --build
@@ -55,6 +59,14 @@ Docker와 Docker Compose가 설치되어 있어야 합니다.
 3.  **서비스 접속**
     - **웹사이트**: [http://localhost:3000](http://localhost:3000)
     - **백엔드 API**: [http://localhost:3001](http://localhost:3001)
+    - **DB 헬스체크**: [http://localhost:3001/health/db](http://localhost:3001/health/db)
+    - **업로드 파일 경로**: [http://localhost:3001/uploads](http://localhost:3001/uploads)
+
+4. **주요 API 경로**
+    - `POST /auth/signup`, `POST /auth/login`, `POST /auth/logout`, `GET /auth/me`
+    - `POST /db/select`, `POST /db/insert`, `POST /db/update`, `POST /db/delete`
+    - `POST /runner/`, `POST /testCase/generate`
+    - `POST /storage/upload`
 
 ## 📂 프로젝트 구조
 

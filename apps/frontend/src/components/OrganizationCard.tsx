@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { User, Lock, LockOpen, Calendar, Plus } from "lucide-react";
+import { User, Lock, Calendar, Plus } from "lucide-react";
 
 import { createClient } from "@lib/supabase/client";
 
@@ -165,24 +165,21 @@ const OrganizationCard: React.FC<{
       href={`/organization/${organization.id}`}
       className="flex flex-col gap-4 border border-gray-300 px-6 py-4 rounded-lg shadow-md transition hover:scale-105 cursor-pointer"
     >
-      <h1 className="text-left text-xl font-bold truncate">
-        {organization.name}
-      </h1>
+      <div className="flex items-center gap-2 min-w-0">
+        <h1 className="text-left text-xl font-bold truncate">
+          {organization.name}
+        </h1>
+        {organization.is_private && (
+          <Lock
+            className="w-5 h-5 shrink-0 text-gray-500"
+            aria-label="비공개 조직"
+          />
+        )}
+      </div>
       <div className="flex items-center gap-2">
         <User className="w-8 h-auto" />
         <h1 className="text-xl font-bold">{organizationMemberCount}</h1>
       </div>
-      {organization.is_private ? (
-        <div className="flex items-center gap-2">
-          <Lock className="w-8 h-auto" />
-          <h1 className="text-xl font-bold">비공개 조직</h1>
-        </div>
-      ) : (
-        <div className="flex items-center gap-2">
-          <LockOpen className="w-8 h-auto" />
-          <h1 className="text-xl font-bold">공개 조직</h1>
-        </div>
-      )}
       <div className="flex items-center gap-2">
         <Calendar className="w-8 h-auto" />
         <h1 className="text-xl font-bold">
