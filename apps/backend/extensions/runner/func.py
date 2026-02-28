@@ -7,12 +7,13 @@ from sqlalchemy import select
 from db.models import Problem, ProblemSubmission, TestCase
 from db.session import SessionLocal
 
-# Piston API가 지원하는 언어와 최신 버전을 매핑합니다.
+# Piston의 설치 버전에 종속되지 않도록 version은 "*"로 요청합니다.
+# (설치된 런타임 중 최신 호환 버전을 자동 선택)
 LANGUAGE_VERSION_MAP = {
-    "c": "10.2.0",
-    "cpp": "10.2.0",
-    "python": "3.12.0",
-    "java": "15.0.2",
+    "c": "*",
+    "cpp": "*",
+    "python": "*",
+    "java": "*",
 }
 
 LANGUAGE_FILENAME_MAP = {
@@ -29,6 +30,17 @@ def normalize_output(text: str) -> list[str]:
         for line in text.strip().replace("\r\n", "\n").split("\n")
         if line.strip()
     ]
+
+
+def normalize_memory_kb(raw_memory: object) -> float:
+    """Piston run.memory is bytes. Persist as KB in DB."""
+    try:
+        value = float(raw_memory or 0)
+    except (TypeError, ValueError):
+        return 0.0
+    if value <= 0:
+        return 0.0
+    return value / 1024.0
 
 
 async def _mark_internal_error(pending_id: int, message: str) -> None:
@@ -61,6 +73,9 @@ async def run_code_in_background(
 
             time_limit_ms = 20000 if problem.time_limit is None else problem.time_limit
             memory_limit_mb = 128 if problem.memory_limit is None else problem.memory_limit
+            run_memory_limit_bytes = memory_limit_mb * 1024 * 1024
+            # 컴파일 단계는 런타임 메모리 제한보다 여유를 둡니다.
+            compile_memory_limit_bytes = max(run_memory_limit_bytes, 512 * 1024 * 1024)
 
             test_cases_result = await db.execute(
                 select(TestCase).where(TestCase.problem_id == problem_id)
@@ -86,8 +101,8 @@ async def run_code_in_background(
                             "files": [{"name": filename, "content": code}],
                             "stdin": test_case.input,
                             "run_timeout": time_limit_ms,
-                            "compile_memory_limit": memory_limit_mb * 1024 * 1024,
-                            "run_memory_limit": memory_limit_mb * 1024 * 1024,
+                            "compile_memory_limit": compile_memory_limit_bytes,
+                            "run_memory_limit": run_memory_limit_bytes,
                         }
 
                         response = await client.post(
@@ -95,7 +110,34 @@ async def run_code_in_background(
                             json=payload,
                             timeout=(time_limit_ms / 1000) + 5,
                         )
-                        response.raise_for_status()
+                        if response.status_code >= 400:
+                            try:
+                                err_payload = response.json()
+                            except Exception:
+                                err_payload = None
+                            err_message = (
+                                err_payload.get("message")
+                                if isinstance(err_payload, dict)
+                                else None
+                            )
+                            result_list.append(
+                                {
+                                    "stdout": "",
+                                    "stderr": err_message
+                                    or f"Piston API request failed ({response.status_code})",
+                                    "is_correct": False,
+                                    "is_timeout": False,
+                                    "is_memory_over": False,
+                                    "exit_code": -1,
+                                    "runtime_ms": 0,
+                                    "memory_kb": 0,
+                                }
+                            )
+                            submission.cases_done = index + 1
+                            submission.cases_total = len(test_cases)
+                            await db.commit()
+                            continue
+
                         result = response.json()
 
                         if "message" in result:
@@ -106,7 +148,8 @@ async def run_code_in_background(
                         stderr = run_result.get("stderr", "")
                         exit_code = run_result.get("code", 0)
                         status = run_result.get("status")
-                        memory = run_result.get("memory") or 0
+                        memory_bytes = run_result.get("memory") or 0
+                        memory_kb = normalize_memory_kb(memory_bytes)
                         wall_time = run_result.get("wall_time", 0)
 
                         expected_output = normalize_output(test_case.output)
@@ -126,7 +169,7 @@ async def run_code_in_background(
                                 "is_memory_over": is_memory_exceeded,
                                 "exit_code": exit_code,
                                 "runtime_ms": wall_time,
-                                "memory_kb": memory,
+                                "memory_kb": memory_kb,
                             }
                         )
 

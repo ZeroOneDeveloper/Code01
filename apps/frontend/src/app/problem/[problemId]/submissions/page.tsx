@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 
+import { formatMemoryKb } from "@lib/format-memory";
 import { Submission, toStatusKo } from "@lib/types";
 import type { RealtimePostgresChangesPayload } from "@lib/supabase/types";
 import { createClient } from "@lib/supabase/client";
@@ -14,6 +15,7 @@ const labels = [
   "결과",
   "메모리",
   "시간",
+  "언어",
   "코드",
   "코드 길이",
   "제출한 시간",
@@ -31,45 +33,26 @@ type SubmissionRow = Submission & {
 const SubmissionsPage: React.FC = () => {
   const params = useParams<{ problemId: string }>();
   const searchParams = useSearchParams();
+  const supabase = useMemo(() => createClient(), []);
   const [submissions, setSubmissions] = useState<SubmissionRow[]>([]);
   const [nicknames, setNicknames] = useState<Record<string, string>>({});
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const pendingParam =
     searchParams.get("pending_id") ?? searchParams.get("pendingId") ?? null;
-  const pendingIdNum = pendingParam ? Number(pendingParam) : null;
+  const parsedPendingId = pendingParam ? Number(pendingParam) : null;
+  const pendingIdNum =
+    parsedPendingId !== null && Number.isFinite(parsedPendingId)
+      ? parsedPendingId
+      : null;
 
   // Derive stable keys from URL params for effect deps
-  const onlyMine = searchParams.get("user_id") === "true";
+  const onlyMine =
+    searchParams.get("user_id") === "true" ||
+    searchParams.get("sure_id") === "true";
   const searchKey = searchParams.toString();
-
-  // Helper to pull the latest single submission row by id and merge into state
-  const refreshSubmissionById = async (id: number) => {
-    try {
-      const supabase = createClient();
-      const { data, error } = await supabase
-        .from("problem_submissions")
-        .select("*")
-        .eq("id", id)
-        .maybeSingle();
-      if (error) {
-        console.debug("[Realtime][pull] error", error);
-        return;
-      }
-      if (data) {
-        setSubmissions((prev) =>
-          prev.map((s) =>
-            Number(s.id) === Number(data.id) ? { ...s, ...data } : s,
-          ),
-        );
-      }
-    } catch (e) {
-      console.debug("[Realtime][pull] exception", e);
-    }
-  };
 
   useEffect(() => {
     const fetchSubmissions = async () => {
-      const supabase = createClient();
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -119,10 +102,9 @@ const SubmissionsPage: React.FC = () => {
     };
 
     fetchSubmissions();
-  }, [params.problemId, searchKey, onlyMine]);
+  }, [params.problemId, searchKey, onlyMine, supabase]);
 
   useEffect(() => {
-    const supabase = createClient();
     let channel: ReturnType<typeof supabase.channel> | null = null;
 
     if (pendingIdNum !== null) {
@@ -137,13 +119,12 @@ const SubmissionsPage: React.FC = () => {
         (payload: RealtimePostgresChangesPayload<SubmissionRow>) => {
           console.debug("[Realtime] payload", payload);
           const row = (payload.new ?? payload.old) as SubmissionRow;
+          if (!row) return;
           setSubmissions((prev) =>
             prev.map((s) =>
               Number(s.id) === Number(row.id) ? { ...s, ...row } : s,
             ),
           );
-          // Pull the freshest row to avoid missing partial fields in payload
-          refreshSubmissionById(Number(row.id));
         },
       );
       console.debug(
@@ -162,39 +143,7 @@ const SubmissionsPage: React.FC = () => {
         supabase.removeChannel(channel);
       }
     };
-  }, [pendingIdNum]);
-
-  // Fallback polling while pending row is active
-  useEffect(() => {
-    if (pendingIdNum === null) return;
-    let timer: ReturnType<typeof setInterval> | null = null;
-
-    const tick = async () => {
-      await refreshSubmissionById(pendingIdNum);
-      // stop automatically if the pending row is complete (cd >= ct) or not present
-      const s = submissions.find((x) => Number(x.id) === pendingIdNum);
-      const cd = s?.cases_done ?? undefined;
-      const ct = s?.cases_total ?? undefined;
-      if (
-        typeof cd === "number" &&
-        typeof ct === "number" &&
-        ct > 0 &&
-        cd >= ct
-      ) {
-        if (timer) {
-          clearInterval(timer);
-          timer = null;
-        }
-      }
-    };
-
-    // Start a gentle fallback poll (e.g., 1s) until complete
-    timer = setInterval(tick, 1000);
-
-    return () => {
-      if (timer) clearInterval(timer);
-    };
-  }, [pendingIdNum, submissions]);
+  }, [pendingIdNum, supabase]);
 
   return (
     <div className="p-4">
@@ -209,8 +158,8 @@ const SubmissionsPage: React.FC = () => {
           </tr>
         </thead>
         <tbody>
-          {submissions.map((s, idx) => (
-            <tr key={idx} className="border-b">
+          {submissions.map((s) => (
+            <tr key={s.id} className="border-b">
               {(() => {
                 const cd = s.cases_done ?? undefined;
                 const ct = s.cases_total ?? undefined;
@@ -243,8 +192,9 @@ const SubmissionsPage: React.FC = () => {
                   s.id,
                   nicknames[s.user_id] || "Unknown User",
                   resultText,
-                  `${s.memory_kb ?? "-"} KB`,
+                  formatMemoryKb(s.memory_kb),
                   `${s.time_ms ?? "-"} ms`,
+                  s.language || "-",
                   s.user_id === currentUserId ? (
                     ["조회", `/problem/${s.problem_id}/submissions/${s.id}`]
                   ) : (
@@ -269,6 +219,7 @@ const SubmissionsPage: React.FC = () => {
                   {Array.isArray(v) ? (
                     <Link
                       href={v[1]}
+                      prefetch={false}
                       className="font-semibold cursor-pointer text-blue-600 dark:text-blue-400 hover:underline"
                     >
                       {v[0]}

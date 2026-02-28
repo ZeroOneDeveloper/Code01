@@ -34,7 +34,7 @@ function clamp(n: number, lo: number, hi: number) {
 }
 
 export default function ProblemTestsPage() {
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   const params = useSearchParams();
   const problemId = Number(params.get("id") || 0);

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useTheme } from "next-themes";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -17,7 +17,7 @@ const LoginForm = () => {
   const resetStatus = searchParams.get("reset");
   const hasShownResetToastRef = React.useRef(false);
 
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   useEffect(() => {
     if (!code) return;

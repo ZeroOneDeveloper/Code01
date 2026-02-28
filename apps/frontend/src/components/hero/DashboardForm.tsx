@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { motion } from "framer-motion";
+import { AlertCircle, CheckCircle2, Save } from "lucide-react";
 
 import { UserProfile } from "@lib/types";
 
@@ -19,93 +19,165 @@ const DashboardForm: React.FC<{
   const [studentId, setStudentId] = React.useState(user.student_id || "");
   const [nickname, setNickname] = React.useState(user.nickname || "");
   const [fullName, setFullName] = React.useState(user.name || "");
-  const [email, setEmail] = React.useState(user.email);
-  const [role, setRole] = React.useState(user.is_admin ? "관리자" : "유저");
-
   const [isEdited, setIsEdited] = React.useState(false);
+  const [isSaving, setIsSaving] = React.useState(false);
+  const [feedback, setFeedback] = React.useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
+
+  const readonlyRole = user.is_admin ? "관리자" : "유저";
+
+  const onFieldChange =
+    (setter: (value: string) => void) =>
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      setter(e.target.value);
+      setIsEdited(true);
+      setFeedback(null);
+    };
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!isEdited || isSaving) return;
+
+    setIsSaving(true);
+    setFeedback(null);
+    const result = await updateUserProfile(studentId, nickname, fullName);
+
+    if (result.error) {
+      setFeedback({ type: "error", message: result.error });
+      setIsSaving(false);
+      return;
+    }
+
+    setFeedback({ type: "success", message: "프로필이 저장되었습니다." });
+    setIsEdited(false);
+    setIsSaving(false);
+  };
+
   return (
-    <form className="mt-6 space-y-4">
-      {[
-        {
-          label: "학번",
-          value: studentId,
-          htmlFor: "studentId",
-          onChange: setStudentId,
-          disabled: false,
-        },
-        {
-          label: "닉네임",
-          value: nickname,
-          htmlFor: "nickname",
-          onChange: setNickname,
-          disabled: false,
-        },
-        {
-          label: "이름",
-          value: fullName,
-          htmlFor: "fullName",
-          onChange: setFullName,
-          disabled: false,
-        },
-        {
-          label: "이메일 주소",
-          value: email,
-          htmlFor: "email",
-          onChange: setEmail,
-          disabled: true,
-        },
-        {
-          label: "역할",
-          value: role,
-          htmlFor: "role",
-          onChange: setRole,
-          disabled: true,
-        },
-      ].map((item, i) => (
-        <div key={i}>
+    <form className="space-y-6" onSubmit={handleSubmit}>
+      <div>
+        <h2 className="text-xl font-semibold text-gray-100">프로필 정보</h2>
+        <p className="mt-1 text-sm text-gray-400">
+          학번, 닉네임, 이름을 최신 상태로 유지하세요.
+        </p>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <div>
           <label
-            htmlFor={item.htmlFor}
-            className="block text-sm font-medium mb-1 text-black dark:text-white"
+            htmlFor="studentId"
+            className="mb-1 block text-sm font-medium text-gray-200"
           >
-            {item.label}
+            학번
           </label>
           <input
-            id={item.htmlFor}
-            name={item.htmlFor}
+            id="studentId"
+            name="studentId"
             type="text"
-            value={item.value}
-            onChange={(e) => {
-              item.onChange(e.target.value);
-              setIsEdited(true);
-            }}
-            disabled={item.disabled}
-            className={`w-full rounded border border-gray-300 dark:border-gray-700 dark:bg-gray-900 px-3 py-2 ${item.disabled ? "bg-gray-100 dark:bg-gray-900 text-gray-500 cursor-not-allowed" : "bg-gray-50 text-black dark:bg-gray-800 dark:text-white"}`}
+            value={studentId}
+            onChange={onFieldChange(setStudentId)}
+            className="w-full rounded-md border border-gray-600 bg-[#10141e] px-3 py-2 text-gray-100 outline-none focus:border-teal-400"
           />
         </div>
-      ))}
 
-      <motion.button
-        initial={false}
-        animate={{
-          backgroundColor: isEdited ? "#2563eb" : "#d1d5db",
-          color: isEdited ? "#ffffff" : "#9ca3af",
-          cursor: isEdited ? "pointer" : "not-allowed",
-        }}
-        whileHover={isEdited ? { scale: 1.05 } : {}}
-        transition={{ duration: 0.3 }}
-        className="text-sm font-medium px-4 py-2 rounded"
-        disabled={!isEdited}
-        onClick={async (e) => {
-          e.preventDefault();
-          if (!isEdited) return;
+        <div>
+          <label
+            htmlFor="nickname"
+            className="mb-1 block text-sm font-medium text-gray-200"
+          >
+            닉네임
+          </label>
+          <input
+            id="nickname"
+            name="nickname"
+            type="text"
+            value={nickname}
+            onChange={onFieldChange(setNickname)}
+            className="w-full rounded-md border border-gray-600 bg-[#10141e] px-3 py-2 text-gray-100 outline-none focus:border-teal-400"
+          />
+        </div>
 
-          await updateUserProfile(studentId, nickname, fullName);
+        <div>
+          <label
+            htmlFor="fullName"
+            className="mb-1 block text-sm font-medium text-gray-200"
+          >
+            이름
+          </label>
+          <input
+            id="fullName"
+            name="fullName"
+            type="text"
+            value={fullName}
+            onChange={onFieldChange(setFullName)}
+            className="w-full rounded-md border border-gray-600 bg-[#10141e] px-3 py-2 text-gray-100 outline-none focus:border-teal-400"
+          />
+        </div>
 
-          setIsEdited(false);
-        }}
-      >
-        프로필 수정
-      </motion.button>
+        <div>
+          <label
+            htmlFor="email"
+            className="mb-1 block text-sm font-medium text-gray-200"
+          >
+            이메일 주소
+          </label>
+          <input
+            id="email"
+            name="email"
+            type="text"
+            value={user.email}
+            disabled
+            className="w-full cursor-not-allowed rounded-md border border-gray-700 bg-[#0e1118] px-3 py-2 text-gray-400"
+          />
+        </div>
+
+        <div className="md:col-span-2">
+          <label
+            htmlFor="role"
+            className="mb-1 block text-sm font-medium text-gray-200"
+          >
+            역할
+          </label>
+          <input
+            id="role"
+            name="role"
+            type="text"
+            value={readonlyRole}
+            disabled
+            className="w-full cursor-not-allowed rounded-md border border-gray-700 bg-[#0e1118] px-3 py-2 text-gray-400"
+          />
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          type="submit"
+          disabled={!isEdited || isSaving}
+          className={`inline-flex items-center gap-2 rounded-md border px-4 py-2 text-sm font-semibold transition-colors ${
+            isEdited && !isSaving
+              ? "border-teal-500/70 bg-teal-500/20 text-teal-200 hover:bg-teal-500/30"
+              : "cursor-not-allowed border-gray-700 bg-gray-800/70 text-gray-500"
+          }`}
+        >
+          <Save className="h-4 w-4" />
+          {isSaving ? "저장 중..." : "프로필 저장"}
+        </button>
+
+        {feedback?.type === "success" && (
+          <p className="inline-flex items-center gap-1 text-sm text-emerald-400">
+            <CheckCircle2 className="h-4 w-4" />
+            {feedback.message}
+          </p>
+        )}
+        {feedback?.type === "error" && (
+          <p className="inline-flex items-center gap-1 text-sm text-red-400">
+            <AlertCircle className="h-4 w-4" />
+            {feedback.message}
+          </p>
+        )}
+      </div>
     </form>
   );
 };

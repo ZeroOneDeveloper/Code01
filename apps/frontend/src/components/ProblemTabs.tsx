@@ -1,13 +1,13 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useParams, usePathname, useSearchParams } from "next/navigation";
 import Link from "next/link";
 
 import { createClient } from "@lib/supabase/client";
 
 const ProblemTabs: React.FC = () => {
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const { problemId } = useParams<{ problemId: string }>();
   const pathname = usePathname();
   const searchParams = useSearchParams();

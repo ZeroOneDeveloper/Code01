@@ -43,9 +43,10 @@ type UpcomingQuiz = {
   time_limit_sec: number | null;
   assignment_mode: string | null;
   problem_count: number | null;
+  status?: "upcoming" | "active" | string;
 };
 
-type SortKey = "title" | "source" | "uploader";
+type SortKey = "id" | "title" | "source" | "uploader";
 type SortDir = "asc" | "desc";
 
 type Props = {
@@ -63,6 +64,10 @@ function sortProblems(
   sortDir: SortDir,
 ) {
   const sorted = [...problems].sort((a, b) => {
+    if (sortKey === "id") {
+      return a.id - b.id;
+    }
+
     const av =
       sortKey === "title"
         ? a.title
@@ -153,15 +158,6 @@ export default function MainProblemSections({
       .filter((section) => section.problems.length > 0);
   }, [sections, search, sortKey, sortDir]);
 
-  const visibleProblemCount = useMemo(
-    () =>
-      filteredSections.reduce(
-        (acc, section) => acc + section.problems.length,
-        0,
-      ),
-    [filteredSections],
-  );
-
   const toggleSort = (key: SortKey) => {
     setSortKey((prevKey) => {
       if (prevKey === key) {
@@ -184,25 +180,54 @@ export default function MainProblemSections({
     );
   };
 
+  const scheduledQuizzes = useMemo(() => {
+    return [...upcomingQuizzes].sort((a, b) => {
+      const aPriority = a.status === "active" ? 0 : 1;
+      const bPriority = b.status === "active" ? 0 : 1;
+      if (aPriority !== bPriority) return aPriority - bPriority;
+
+      const aStart = a.start_at ? new Date(a.start_at).getTime() : Number.MAX_SAFE_INTEGER;
+      const bStart = b.start_at ? new Date(b.start_at).getTime() : Number.MAX_SAFE_INTEGER;
+      return aStart - bStart;
+    });
+  }, [upcomingQuizzes]);
+
   return (
     <div className="max-w-5xl mx-auto space-y-6">
-      {authenticated && upcomingQuizzes.length > 0 && (
+      {authenticated && scheduledQuizzes.length > 0 && (
         <section className="rounded-lg border border-teal-200/70 dark:border-teal-900/50 bg-teal-50/40 dark:bg-teal-950/20 p-4 space-y-3">
           <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold">예정 퀴즈</h3>
+            <h3 className="text-lg font-semibold">진행/예정 퀴즈</h3>
             <span className="text-xs text-gray-600 dark:text-gray-300">
-              {upcomingQuizzes.length}개
+              {scheduledQuizzes.length}개
             </span>
           </div>
           <div className="flex flex-wrap gap-3">
-            {upcomingQuizzes.map((quiz) => (
-              <article
+            {scheduledQuizzes.map((quiz) => {
+              const quizHref =
+                quiz.status === "active"
+                  ? `/quiz/${quiz.organization_id}/${quiz.id}`
+                  : `/quiz/${quiz.organization_id}/${quiz.id}/wait`;
+              return (
+              <Link
                 key={`${quiz.organization_id}:${quiz.id}`}
-                className="min-w-[250px] flex-1 rounded-lg border border-gray-200/90 dark:border-gray-700 bg-white/90 dark:bg-gray-900 p-3"
+                href={quizHref}
+                className="min-w-[250px] flex-1 rounded-lg border border-gray-200/90 dark:border-gray-700 bg-white/90 dark:bg-gray-900 p-3 hover:border-teal-400/70 hover:bg-teal-500/5 transition-colors"
               >
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  {quiz.organization_name}
-                </p>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    {quiz.organization_name}
+                  </p>
+                  <span
+                    className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] ${
+                      quiz.status === "active"
+                        ? "border-emerald-500/50 bg-emerald-500/15 text-emerald-300"
+                        : "border-amber-500/50 bg-amber-500/15 text-amber-300"
+                    }`}
+                  >
+                    {quiz.status === "active" ? "진행중" : "예정"}
+                  </span>
+                </div>
                 <h4 className="mt-1 text-sm font-semibold line-clamp-1">
                   {quiz.title}
                 </h4>
@@ -213,20 +238,15 @@ export default function MainProblemSections({
                   마감: {formatDateTime(quiz.end_at)}
                 </p>
                 <p className="mt-2 text-xs text-primary">{formatAssignment(quiz)}</p>
-              </article>
-            ))}
+              </Link>
+              );
+            })}
           </div>
         </section>
       )}
 
       {sections.length > 0 ? (
         <>
-          <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-3">
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              현재 표시: {visibleProblemCount}문제
-            </p>
-          </div>
-
           {isSearchMenuOpen && (
             <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-3">
               <label className="relative block">
@@ -283,7 +303,14 @@ export default function MainProblemSections({
                       <thead>
                         <tr className="bg-gray-100 dark:bg-gray-800">
                           <th className="px-4 py-2 text-left font-semibold text-gray-700 dark:text-gray-200 border-b">
-                            문제
+                            <button
+                              type="button"
+                              onClick={() => toggleSort("id")}
+                              className="inline-flex items-center gap-1 hover:text-primary"
+                            >
+                              문제
+                              {sortIcon("id")}
+                            </button>
                           </th>
                           <th className="px-4 py-2 text-left font-semibold text-gray-700 dark:text-gray-200 border-b">
                             <button

@@ -1,11 +1,11 @@
 "use client";
 
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useMemo } from "react";
 import { useParams } from "next/navigation";
 import { useTheme } from "next-themes";
 
 import { Bounce, toast } from "react-toastify";
-import { ShieldUser, User, UserMinus, X } from "lucide-react";
+import { ShieldUser, User, UserMinus, UserPlus, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 import { Organization } from "@lib/types";
@@ -16,7 +16,7 @@ const OrganizationManagementPage: React.FC = () => {
   const { organizationId } = useParams<{ organizationId: string }>();
   const { theme } = useTheme();
 
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   const [user, setUser] = useState<UserType | null>(null);
   const [organization, setOrganization] = useState<Organization | null>(null);
@@ -343,119 +343,182 @@ const OrganizationManagementPage: React.FC = () => {
     );
   }
 
+  const adminCount = members.filter((member) => member.role === "admin").length;
+  const memberCount = members.length - adminCount;
+
   return (
     <>
-      <div className="flex flex-col gap-8">
-        <table className="w-full table-auto border-collapse text-sm text-center">
-          <thead>
-            <tr className="border-b">
-              {[
-                "이름",
-                "학번",
-                "닉네임",
-                "이메일",
-                "역할",
-                "가입 시간",
-                "동작",
-              ].map((header, i) => (
-                <th key={i} className="p-2 text-center">
-                  {header}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {members.map((member, idx) => (
-              <tr key={idx} className="border-b">
-                {[
-                  member?.name,
-                  member?.studentId,
-                  member?.nickname,
-                  member?.email,
-                  member?.role,
-                  new Date(member?.joinedAt).toLocaleString("ko-KR", {
-                    timeZone: "Asia/Seoul",
-                  }),
-                ].map((v, i) => (
-                  <td key={i} className="p-2 text-center truncate">
-                    {i === 4 ? (
-                      <div className="flex items-center justify-center gap-1">
-                        {v === "admin" ? (
-                          <>
-                            <ShieldUser className="h-4 w-4 text-blue-500" />
-                            <span>관리자</span>
-                          </>
+      <div className="w-full max-w-5xl mx-auto space-y-4 px-2 md:px-0">
+        <section className="rounded-xl border border-gray-700 bg-[#181b24] p-4 md:p-5">
+          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+            <div>
+              <h2 className="text-xl font-semibold text-gray-100">유저 관리</h2>
+              <p className="mt-1 text-sm text-gray-400">
+                조직 멤버 권한을 관리하고 신규 멤버를 초대합니다.
+              </p>
+            </div>
+            <button
+              className="inline-flex items-center gap-2 rounded-md border border-teal-500/60 bg-teal-500/15 px-3 py-2 text-sm font-semibold text-teal-200 hover:bg-teal-500/25 transition-colors"
+              onClick={() => setInviteModalOpen(true)}
+            >
+              <UserPlus className="h-4 w-4" /> 유저 추가
+            </button>
+          </div>
+          <div className="mt-4 grid gap-2 sm:grid-cols-3">
+            <div className="rounded-md border border-gray-700 bg-[#121723] px-3 py-2">
+              <p className="text-xs text-gray-400">전체 멤버</p>
+              <p className="text-base font-semibold text-gray-100">
+                {members.length}
+              </p>
+            </div>
+            <div className="rounded-md border border-gray-700 bg-[#121723] px-3 py-2">
+              <p className="text-xs text-gray-400">관리자</p>
+              <p className="text-base font-semibold text-gray-100">{adminCount}</p>
+            </div>
+            <div className="rounded-md border border-gray-700 bg-[#121723] px-3 py-2">
+              <p className="text-xs text-gray-400">일반 멤버</p>
+              <p className="text-base font-semibold text-gray-100">
+                {memberCount}
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section className="rounded-xl border border-gray-700 bg-[#181b24] p-4 md:p-5">
+          <div className="rounded-lg border border-gray-700 overflow-x-auto">
+            <table className="w-full min-w-[1040px] table-fixed text-sm">
+              <colgroup>
+                <col className="w-[10%]" />
+                <col className="w-[10%]" />
+                <col className="w-[10%]" />
+                <col className="w-[28%]" />
+                <col className="w-[10%]" />
+                <col className="w-[18%]" />
+                <col className="w-[14%]" />
+              </colgroup>
+              <thead className="border-b border-gray-700 bg-[#222736]">
+                <tr>
+                  {[
+                    "이름",
+                    "학번",
+                    "닉네임",
+                    "이메일",
+                    "역할",
+                    "가입 시간",
+                    "동작",
+                  ].map((header, i) => (
+                    <th
+                      key={i}
+                      className="px-3 py-2 text-center font-semibold text-gray-100"
+                    >
+                      {header}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-700">
+                {members.map((member, idx) => {
+                  const canManage =
+                    member.id !== user?.id && member.id !== organization.created_by;
+                  return (
+                    <tr key={idx} className="hover:bg-[#202635]">
+                      <td className="px-3 py-2 text-center text-gray-200">
+                        {member.name || "─"}
+                      </td>
+                      <td className="px-3 py-2 text-center text-gray-200">
+                        {member.studentId || "─"}
+                      </td>
+                      <td className="px-3 py-2 text-center text-gray-200">
+                        {member.nickname || "─"}
+                      </td>
+                      <td className="px-3 py-2 text-center text-gray-300">
+                        <span className="inline-block max-w-[260px] truncate align-middle">
+                          {member.email}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 text-center">
+                        <div className="inline-flex items-center justify-center gap-1 rounded-full border border-gray-600 bg-[#121723] px-2 py-0.5 text-xs text-gray-200">
+                          {member.role === "admin" ? (
+                            <>
+                              <ShieldUser className="h-3.5 w-3.5 text-blue-400" />
+                              <span>관리자</span>
+                            </>
+                          ) : (
+                            <>
+                              <User className="h-3.5 w-3.5 text-gray-400" />
+                              <span>멤버</span>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-3 py-2 text-center text-gray-300">
+                        {new Date(member.joinedAt).toLocaleString("ko-KR", {
+                          timeZone: "Asia/Seoul",
+                        })}
+                      </td>
+                      <td className="px-3 py-2 text-center">
+                        {canManage ? (
+                          <div className="inline-flex items-center gap-1.5">
+                            <button
+                              onClick={() =>
+                                setModal({
+                                  type: "remove",
+                                  userId: member.id,
+                                })
+                              }
+                              className="rounded-md border border-rose-500/50 bg-rose-500/15 px-2 py-1 text-xs text-rose-300 hover:bg-rose-500/25"
+                              title="멤버 제거"
+                            >
+                              <UserMinus className="h-3.5 w-3.5" />
+                            </button>
+                            {member.role === "admin" ? (
+                              <button
+                                onClick={() =>
+                                  setModal({
+                                    type: "role",
+                                    userId: member.id,
+                                    currentRole: "admin",
+                                  })
+                                }
+                                className="rounded-md border border-emerald-500/50 bg-emerald-500/15 px-2 py-1 text-xs text-emerald-300 hover:bg-emerald-500/25"
+                                title="멤버로 변경"
+                              >
+                                <User className="h-3.5 w-3.5" />
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() =>
+                                  setModal({
+                                    type: "role",
+                                    userId: member.id,
+                                    currentRole: "member",
+                                  })
+                                }
+                                className="rounded-md border border-blue-500/50 bg-blue-500/15 px-2 py-1 text-xs text-blue-300 hover:bg-blue-500/25"
+                                title="관리자로 변경"
+                              >
+                                <ShieldUser className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+                          </div>
                         ) : (
-                          <>
-                            <User className="h-4 w-4 text-gray-500" />
-                            <span>멤버</span>
-                          </>
+                          <span className="text-xs text-gray-500">-</span>
                         )}
-                      </div>
-                    ) : (
-                      v || "─"
-                    )}
-                  </td>
-                ))}
-                {member.id !== user!.id &&
-                  member.id !== organization.created_by && (
-                    <td className="p-2 text-center flex items-center justify-center gap-2">
-                      <button
-                        onClick={() =>
-                          setModal({
-                            type: "remove",
-                            userId: member!.id,
-                          })
-                        }
-                      >
-                        <UserMinus className="w-6 h-auto bg-red-400 p-1 rounded-md text-white dark:text-black hover:cursor-pointer" />
-                      </button>
-                      {member.role === "admin" ? (
-                        <button
-                          onClick={() =>
-                            setModal({
-                              type: "role",
-                              userId: member.id,
-                              currentRole: "admin",
-                            })
-                          }
-                        >
-                          <User className="w-6 h-auto bg-green-400 p-1 rounded-md text-white dark:text-black hover:cursor-pointer" />
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() =>
-                            setModal({
-                              type: "role",
-                              userId: member.id,
-                              currentRole: "member",
-                            })
-                          }
-                        >
-                          <ShieldUser className="w-6 h-auto bg-blue-400 p-1 rounded-md text-white dark:text-black hover:cursor-pointer" />
-                        </button>
-                      )}
+                      </td>
+                    </tr>
+                  );
+                })}
+                {members.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="p-6 text-center text-gray-400">
+                      유저가 없습니다.
                     </td>
-                  )}
-              </tr>
-            ))}
-            {members.length === 0 && (
-              <tr>
-                <td colSpan={7} className="p-4 text-center text-gray-500">
-                  유저가 없습니다
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-        <div className="w-full flex justify-end">
-          <button
-            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors hover:cursor-pointer"
-            onClick={() => setInviteModalOpen(true)}
-          >
-            추가
-          </button>
-        </div>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
       </div>
 
       <AnimatePresence>

@@ -18,6 +18,7 @@ from db.models import (
     ProblemAsset,
     ProblemSubmission,
     Quiz,
+    QuizAttempt,
     QuizProblem,
     TestCase,
     User,
@@ -42,6 +43,7 @@ MODEL_MAP = {
     "problem_submissions": ProblemSubmission,
     "quizzes": Quiz,
     "quiz_problems": QuizProblem,
+    "quiz_attempts": QuizAttempt,
 }
 
 

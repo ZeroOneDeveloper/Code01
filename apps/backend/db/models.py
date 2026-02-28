@@ -183,6 +183,14 @@ class ProblemSubmission(Base):
         ForeignKey("problems.id", ondelete="CASCADE"),
         nullable=False,
     )
+    quiz_id: Mapped[int | None] = mapped_column(
+        BigInteger,
+        ForeignKey("quizzes.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    quiz_attempt_started_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     code: Mapped[str] = mapped_column(Text, nullable=False)
     passed_all: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     stdout_list: Mapped[list[str]] = mapped_column(ARRAY(Text), nullable=False, default=list)
@@ -200,6 +208,24 @@ class ProblemSubmission(Base):
     cases_total: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=0)
     cases_done: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=0)
     language: Mapped[str] = mapped_column(Text, nullable=False)
+
+
+class QuizAttempt(Base):
+    __tablename__ = "quiz_attempts"
+
+    quiz_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("quizzes.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    started_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utcnow
+    )
 
 
 class Quiz(Base):

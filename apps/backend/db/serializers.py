@@ -8,6 +8,7 @@ from .models import (
     ProblemAsset,
     ProblemSubmission,
     Quiz,
+    QuizAttempt,
     QuizProblem,
     TestCase,
     User,
@@ -100,6 +101,8 @@ def serialize_problem_submission(submission: ProblemSubmission) -> dict[str, Any
         "id": submission.id,
         "user_id": str(submission.user_id),
         "problem_id": submission.problem_id,
+        "quiz_id": submission.quiz_id,
+        "quiz_attempt_started_at": _dt(submission.quiz_attempt_started_at),
         "code": submission.code,
         "passed_all": submission.passed_all,
         "stdout_list": submission.stdout_list,
@@ -145,6 +148,14 @@ def serialize_quiz_problem(quiz_problem: QuizProblem) -> dict[str, Any]:
     }
 
 
+def serialize_quiz_attempt(quiz_attempt: QuizAttempt) -> dict[str, Any]:
+    return {
+        "quiz_id": quiz_attempt.quiz_id,
+        "user_id": str(quiz_attempt.user_id),
+        "started_at": _dt(quiz_attempt.started_at),
+    }
+
+
 def serialize_row(row: Any) -> dict[str, Any]:
     if isinstance(row, User):
         return serialize_user(row)
@@ -164,5 +175,7 @@ def serialize_row(row: Any) -> dict[str, Any]:
         return serialize_quiz(row)
     if isinstance(row, QuizProblem):
         return serialize_quiz_problem(row)
+    if isinstance(row, QuizAttempt):
+        return serialize_quiz_attempt(row)
 
     raise TypeError(f"Unsupported row type: {type(row)!r}")

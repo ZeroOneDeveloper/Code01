@@ -15,6 +15,7 @@ from db.models import (
     Problem,
     ProblemSubmission,
     Quiz,
+    QuizAttempt,
     QuizProblem,
     TestCase,
     User,
@@ -103,6 +104,8 @@ def submission_to_dict(submission: ProblemSubmission) -> dict:
         "id": submission.id,
         "user_id": str(submission.user_id),
         "problem_id": submission.problem_id,
+        "quiz_id": submission.quiz_id,
+        "quiz_attempt_started_at": dt(submission.quiz_attempt_started_at),
         "code": submission.code,
         "passed_all": submission.passed_all,
         "stdout_list": submission.stdout_list,
@@ -457,6 +460,12 @@ def _is_published(published_at: datetime | None, now: datetime) -> bool:
     return target <= now
 
 
+def _to_utc(value: datetime | None) -> datetime | None:
+    if value is None:
+        return None
+    return value if value.tzinfo is not None else value.replace(tzinfo=timezone.utc)
+
+
 @router.get("/problems/visible")
 async def list_visible_problems(
     request: Request,
@@ -612,10 +621,19 @@ async def list_visible_problems(
                 if quiz.start_at.tzinfo is not None
                 else quiz.start_at.replace(tzinfo=timezone.utc)
             )
-            if quiz_start <= now:
-                continue
             if not _is_published(quiz.published_at, now):
                 continue
+            quiz_end = None
+            if quiz.end_at is not None:
+                quiz_end = (
+                    quiz.end_at
+                    if quiz.end_at.tzinfo is not None
+                    else quiz.end_at.replace(tzinfo=timezone.utc)
+                )
+            if quiz_end is not None and quiz_end <= now:
+                continue
+
+            status = "upcoming" if quiz_start > now else "active"
 
             org = organizations.get(quiz.organization_id)
             upcoming_quizzes.append(
@@ -632,6 +650,7 @@ async def list_visible_problems(
                     "time_limit_sec": quiz.time_limit_sec,
                     "assignment_mode": quiz.assignment_mode,
                     "problem_count": quiz.problem_count,
+                    "status": status,
                 }
             )
 
@@ -798,6 +817,181 @@ async def update_problem_submission(
     return submission_to_dict(item)
 
 
+@router.get("/quizzes/{organization_id}/{quiz_id}/entry-context")
+async def get_quiz_entry_context(
+    organization_id: int,
+    quiz_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    auth_user_id = _auth_user_id_from_request(request)
+    if not auth_user_id:
+        raise HTTPException(status_code=401, detail="로그인이 필요합니다.")
+
+    try:
+        viewer_user_id = uuid.UUID(auth_user_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=401, detail="인증 정보가 유효하지 않습니다.") from exc
+
+    member_row = await db.execute(
+        select(OrganizationMember.organization_id).where(
+            OrganizationMember.organization_id == organization_id,
+            OrganizationMember.user_id == viewer_user_id,
+        )
+    )
+    if member_row.scalar_one_or_none() is None:
+        raise HTTPException(status_code=403, detail="해당 조직 퀴즈에 접근 권한이 없습니다.")
+
+    quiz_row = await db.execute(
+        select(Quiz).where(
+            Quiz.id == quiz_id,
+            Quiz.organization_id == organization_id,
+        )
+    )
+    quiz = quiz_row.scalar_one_or_none()
+    if quiz is None:
+        raise HTTPException(status_code=404, detail="퀴즈를 찾을 수 없습니다.")
+
+    now = datetime.now(timezone.utc)
+    if not _is_published(quiz.published_at, now):
+        raise HTTPException(status_code=403, detail="아직 공개되지 않은 퀴즈입니다.")
+
+    start_at = _to_utc(quiz.start_at)
+    end_at = _to_utc(quiz.end_at)
+    if end_at is not None and now > end_at:
+        status = "ended"
+    elif start_at is not None and now < start_at:
+        status = "upcoming"
+    else:
+        status = "active"
+
+    attempt_started_at: datetime | None = None
+    if status == "active":
+        attempt_row = await db.execute(
+            select(QuizAttempt).where(
+                QuizAttempt.quiz_id == quiz.id,
+                QuizAttempt.user_id == viewer_user_id,
+            )
+        )
+        attempt = attempt_row.scalar_one_or_none()
+        if attempt is None:
+            attempt = QuizAttempt(
+                quiz_id=quiz.id,
+                user_id=viewer_user_id,
+                started_at=now,
+            )
+            db.add(attempt)
+            try:
+                await db.commit()
+            except IntegrityError:
+                await db.rollback()
+                retry_row = await db.execute(
+                    select(QuizAttempt).where(
+                        QuizAttempt.quiz_id == quiz.id,
+                        QuizAttempt.user_id == viewer_user_id,
+                    )
+                )
+                attempt = retry_row.scalar_one_or_none()
+            else:
+                await db.refresh(attempt)
+        attempt_started_at = _to_utc(attempt.started_at) if attempt is not None else now
+
+    pool_rows = await db.execute(
+        select(QuizProblem.problem_id, QuizProblem.order_index)
+        .where(QuizProblem.quiz_id == quiz.id)
+        .order_by(QuizProblem.order_index.asc(), QuizProblem.id.asc())
+    )
+    raw_pool = pool_rows.all()
+
+    pool: list[dict] = []
+    if raw_pool:
+        ordered_problem_ids: list[int] = []
+        for problem_id, _ in raw_pool:
+            if problem_id not in ordered_problem_ids:
+                ordered_problem_ids.append(problem_id)
+
+        title_rows = await db.execute(
+            select(Problem.id, Problem.title).where(Problem.id.in_(ordered_problem_ids))
+        )
+        title_map = {problem_id: title for problem_id, title in title_rows.all()}
+
+        for problem_id, order_index in raw_pool:
+            pool.append(
+                {
+                    "problem_id": problem_id,
+                    "title": title_map.get(problem_id),
+                    "order_index": order_index,
+                }
+            )
+    elif quiz.global_problem_id is not None:
+        global_problem = await db.get(Problem, quiz.global_problem_id)
+        pool.append(
+            {
+                "problem_id": quiz.global_problem_id,
+                "title": global_problem.title if global_problem else None,
+                "order_index": 0,
+            }
+        )
+
+    submission_summary_by_problem: dict[int, dict] = {}
+    pool_problem_ids = list(
+        {
+            int(item["problem_id"])
+            for item in pool
+            if isinstance(item.get("problem_id"), int)
+        }
+    )
+    if pool_problem_ids:
+        submission_rows = await db.execute(
+            select(ProblemSubmission).where(
+                ProblemSubmission.quiz_id == quiz.id,
+                ProblemSubmission.user_id == viewer_user_id,
+                ProblemSubmission.problem_id.in_(pool_problem_ids),
+            )
+        )
+        submissions = submission_rows.scalars().all()
+
+        for pid in pool_problem_ids:
+            per_problem = [s for s in submissions if s.problem_id == pid]
+            if not per_problem:
+                submission_summary_by_problem[pid] = {
+                    "submitted": False,
+                    "submission_count": 0,
+                    "latest_submission_id": None,
+                    "latest_status_code": None,
+                    "latest_is_correct": None,
+                    "latest_submitted_at": None,
+                }
+                continue
+
+            per_problem.sort(
+                key=lambda s: (
+                    _to_utc(s.submitted_at) or datetime.min.replace(tzinfo=timezone.utc),
+                    s.id,
+                ),
+                reverse=True,
+            )
+            latest = per_problem[0]
+            submission_summary_by_problem[pid] = {
+                "submitted": True,
+                "submission_count": len(per_problem),
+                "latest_submission_id": latest.id,
+                "latest_status_code": latest.status_code,
+                "latest_is_correct": latest.is_correct,
+                "latest_submitted_at": dt(_to_utc(latest.submitted_at)),
+            }
+
+    return {
+        "viewer_user_id": str(viewer_user_id),
+        "quiz": quiz_to_dict(quiz),
+        "status": status,
+        "server_now": dt(now),
+        "attempt_started_at": dt(attempt_started_at),
+        "pool": pool,
+        "submission_summary_by_problem": submission_summary_by_problem,
+    }
+
+
 @router.get("/quizzes")
 async def list_quizzes(
     organization_id: int | None = None,
@@ -841,6 +1035,24 @@ async def update_quiz(
     await db.commit()
     await db.refresh(quiz)
     return quiz_to_dict(quiz)
+
+
+@router.delete("/quizzes/{quiz_id}")
+async def delete_quiz(
+    quiz_id: int,
+    organization_id: int | None = None,
+    db: AsyncSession = Depends(get_db),
+):
+    quiz = await db.get(Quiz, quiz_id)
+    if not quiz:
+        raise HTTPException(status_code=404, detail="Quiz not found")
+
+    if organization_id is not None and quiz.organization_id != organization_id:
+        raise HTTPException(status_code=404, detail="Quiz not found")
+
+    await db.delete(quiz)
+    await db.commit()
+    return {"deleted": True, "quiz_id": quiz_id}
 
 
 @router.get("/quiz-problems")

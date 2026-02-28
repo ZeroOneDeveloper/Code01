@@ -1,6 +1,7 @@
 import { updateUserProfile } from "./action";
 
 import React from "react";
+import { BadgeCheck, Mail, UserRound } from "lucide-react";
 
 import { createClient } from "@lib/supabase/server";
 
@@ -20,33 +21,67 @@ const DashboardPage: React.FC = async () => {
   if (!userProfile) {
     return (
       <div className="flex flex-1 justify-center items-center py-10 bg-dark text-white px-4 sm:px-6 lg:px-8">
-        <div className="w-full max-w-5xl bg-black rounded-lg p-6">
-          <h1 className="text-xl font-semibold">
+        <div className="w-full max-w-5xl rounded-xl border border-gray-700 bg-[#181b24] p-6">
+          <h1 className="text-xl font-semibold text-white">
             사용자 정보를 찾을 수 없습니다.
           </h1>
         </div>
       </div>
     );
   }
+
+  const displayName =
+    userProfile.name || userProfile.nickname || userProfile.email;
+  const roleLabel = userProfile.is_admin ? "관리자" : "유저";
+  const initial = (displayName?.trim()?.[0] ?? "U").toUpperCase();
+
   return (
-    <div className="flex flex-1 justify-center items-center bg-dark text-white px-4 sm:px-6 lg:px-8 py-8">
-      <div className="w-full max-w-5xl flex flex-col md:flex-row bg-gray-50 dark:bg-black rounded-lg">
-        <aside className="w-full md:w-64 p-6 bg-gray-200 dark:bg-zinc-900 border-b md:border-b-0 md:border-r border-gray-300 dark:border-zinc-800 rounded-t-lg md:rounded-t-none md:rounded-l-lg">
-          <h2 className="text-xl font-semibold mb-6 text-black dark:text-white">
-            Account
-          </h2>
-          <nav className="flex flex-col space-y-3">
-            <button className="text-left text-white font-medium bg-gray-800 dark:bg-zinc-800 hover:bg-gray-700 dark:hover:bg-zinc-700 px-4 py-2 rounded">
-              Profile
-            </button>
-          </nav>
-        </aside>
-        <main className="flex-1 p-6 md:p-8 rounded-b-lg md:rounded-b-none md:rounded-r-lg ">
-          <DashboardForm
-            user={userProfile as UserProfile}
-            updateUserProfile={updateUserProfile}
-          />
-        </main>
+    <div className="flex flex-1 justify-center bg-dark text-white px-4 sm:px-6 lg:px-8 py-8">
+      <div className="w-full max-w-5xl space-y-6">
+        <div className="border-b border-gray-700/70 pb-4">
+          <h1 className="text-3xl font-bold tracking-tight">Account Settings</h1>
+          <p className="mt-1 text-sm text-gray-400">
+            계정 기본 정보와 프로필을 관리합니다.
+          </p>
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
+          <aside className="rounded-xl border border-gray-700 bg-[#181b24] p-5">
+            <div className="flex items-center gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-teal-500/20 text-lg font-bold text-teal-300">
+                {initial}
+              </div>
+              <div className="min-w-0">
+                <p className="truncate text-base font-semibold text-gray-100">
+                  {displayName}
+                </p>
+                <p className="text-xs text-gray-400">{roleLabel}</p>
+              </div>
+            </div>
+
+            <div className="mt-5 space-y-3 text-sm">
+              <div className="flex items-center gap-2 text-gray-300">
+                <Mail className="h-4 w-4 text-gray-400" />
+                <span className="truncate">{userProfile.email}</span>
+              </div>
+              <div className="flex items-center gap-2 text-gray-300">
+                <UserRound className="h-4 w-4 text-gray-400" />
+                <span>닉네임: {userProfile.nickname || "-"}</span>
+              </div>
+              <div className="flex items-center gap-2 text-gray-300">
+                <BadgeCheck className="h-4 w-4 text-gray-400" />
+                <span>학번: {userProfile.student_id || "-"}</span>
+              </div>
+            </div>
+          </aside>
+
+          <main className="rounded-xl border border-gray-700 bg-[#181b24] p-6 md:p-7">
+            <DashboardForm
+              user={userProfile as UserProfile}
+              updateUserProfile={updateUserProfile}
+            />
+          </main>
+        </div>
       </div>
     </div>
   );

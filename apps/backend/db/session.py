@@ -66,3 +66,12 @@ async def init_db() -> None:
         await conn.exec_driver_sql(
             "ALTER TABLE pending_signups ADD COLUMN IF NOT EXISTS nickname text"
         )
+        await conn.exec_driver_sql(
+            "ALTER TABLE problem_submissions ADD COLUMN IF NOT EXISTS quiz_id bigint REFERENCES quizzes(id) ON DELETE SET NULL"
+        )
+        await conn.exec_driver_sql(
+            "ALTER TABLE problem_submissions ADD COLUMN IF NOT EXISTS quiz_attempt_started_at timestamptz"
+        )
+        await conn.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS idx_problem_submissions_user_quiz_submitted_at ON problem_submissions(user_id, quiz_id, submitted_at DESC)"
+        )

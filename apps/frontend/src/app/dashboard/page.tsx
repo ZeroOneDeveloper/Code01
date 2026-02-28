@@ -10,6 +10,7 @@ import {
   UserCheck,
 } from "lucide-react";
 
+import { formatMemoryKb } from "@lib/format-memory";
 import { createClient } from "@lib/supabase/server";
 
 type SubmissionRow = {
@@ -449,7 +450,7 @@ export default async function DashboardPage() {
                           <td className="py-2 pr-4 uppercase">{submission.language}</td>
                           <td className="py-2 pr-4">{submission.time_ms} ms</td>
                           <td className="py-2 pr-4">
-                            {submission.memory_kb.toFixed(1)} KB
+                            {formatMemoryKb(submission.memory_kb)}
                           </td>
                           <td className="py-2 pr-4">
                             <span

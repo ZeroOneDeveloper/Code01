@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 
@@ -40,7 +40,7 @@ const menuItems = [
 ];
 
 export default function Header() {
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
   const pathname = usePathname();
 
@@ -127,7 +127,10 @@ export default function Header() {
             aria-label="문제 검색"
             title="문제 검색"
           >
-            <Search className="h-5 w-5 dark:text-gray-100" />
+            <Search
+              className="h-6 w-6 text-gray-800 dark:text-gray-100"
+              strokeWidth={2.25}
+            />
           </button>
         )}
         {user ? (
@@ -234,7 +237,10 @@ export default function Header() {
                   aria-label="문제 검색"
                   title="문제 검색"
                 >
-                  <Search className="h-5 w-5 dark:text-gray-100" />
+                  <Search
+                    className="h-6 w-6 text-gray-800 dark:text-gray-100"
+                    strokeWidth={2.25}
+                  />
                 </button>
               )}
               <hr className="w-full border-gray-200 dark:border-gray-700" />

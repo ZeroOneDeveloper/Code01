@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "react-toastify";
 import { createClient } from "@lib/supabase/client";
@@ -30,6 +30,7 @@ export default function QuizDetailPage() {
     organizationId: string;
     quizId: string;
   }>();
+  const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
 
   const [loading, setLoading] = useState(true);
@@ -38,6 +39,7 @@ export default function QuizDetailPage() {
   const [problemTitles, setProblemTitles] = useState<Record<number, string>>(
     {},
   );
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     const run = async () => {
@@ -105,6 +107,35 @@ export default function QuizDetailPage() {
 
   const status = useMemo(() => (quiz ? statusOf(quiz) : null), [quiz]);
 
+  const handleDeleteQuiz = async () => {
+    if (!quiz || deleting || !organizationId) return;
+    const ok = window.confirm(
+      `퀴즈 "${quiz.title}"을(를) 삭제할까요?\n삭제 후 복구할 수 없습니다.`,
+    );
+    if (!ok) return;
+
+    setDeleting(true);
+    try {
+      const { error } = await supabase
+        .from("quizzes")
+        .delete()
+        .eq("id", quiz.id)
+        .eq("organization_id", Number(organizationId));
+
+      if (error) {
+        console.error(error);
+        toast.error("퀴즈 삭제에 실패했습니다.");
+        return;
+      }
+
+      toast.success("퀴즈를 삭제했습니다.");
+      router.replace(`/organization/${organizationId}/quizzes`);
+      router.refresh();
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="max-w-5xl mx-auto p-4">
@@ -168,6 +199,18 @@ export default function QuizDetailPage() {
           >
             편집
           </Link>
+          <button
+            type="button"
+            onClick={() => void handleDeleteQuiz()}
+            disabled={deleting}
+            className={`rounded-md border px-3 py-2 text-sm ${
+              deleting
+                ? "cursor-not-allowed border-rose-900 text-rose-900/70"
+                : "border-rose-600/60 text-rose-300 hover:bg-rose-500/15"
+            }`}
+          >
+            {deleting ? "삭제 중" : "삭제"}
+          </button>
         </div>
       </div>
 

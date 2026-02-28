@@ -1,14 +1,14 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { useParams, useRouter } from "next/navigation";
 import { toast } from "react-toastify";
+
 import { createClient } from "@lib/supabase/client";
 
-// Quiz row type (loose to be compatible with current DB)
 type QuizRow = {
-  id: string;
+  id: number | string;
   organization_id: number;
   title: string;
   description: string | null;
@@ -24,6 +24,8 @@ type QuizRow = {
   created_at?: string;
 };
 
+type StatusFilter = "all" | "upcoming" | "active" | "ended";
+
 export default function QuizzesIndexPage() {
   const { organizationId } = useParams<{ organizationId: string }>();
   const router = useRouter();
@@ -32,9 +34,8 @@ export default function QuizzesIndexPage() {
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<QuizRow[]>([]);
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<
-    "all" | "upcoming" | "active" | "ended"
-  >("all");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [deletingQuizId, setDeletingQuizId] = useState<number | string | null>(null);
 
   useEffect(() => {
     const run = async () => {
@@ -64,12 +65,11 @@ export default function QuizzesIndexPage() {
     const now = Date.now();
     return rows
       .filter((r) => {
-        // search
         if (q) {
           const hay = `${r.title} ${r.description ?? ""}`.toLowerCase();
           if (!hay.includes(q)) return false;
         }
-        // status
+
         if (statusFilter !== "all") {
           const st = statusOf(r, now);
           if (st !== statusFilter) return false;
@@ -82,139 +82,233 @@ export default function QuizzesIndexPage() {
       );
   }, [rows, search, statusFilter]);
 
-  return (
-    <div className="w-full mx-auto p-4 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between gap-3">
-        <h1 className="text-xl font-semibold">퀴즈</h1>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => router.refresh()}
-            className="rounded-md border px-3 py-2 text-sm"
-          >
-            새로고침
-          </button>
-          <Link
-            href={`/organization/${organizationId}/quizzes/new`}
-            className="rounded-md border px-3 py-2 text-sm"
-          >
-            새 퀴즈 만들기
-          </Link>
-        </div>
-      </div>
+  const stats = useMemo(() => {
+    const now = Date.now();
+    return rows.reduce(
+      (acc, row) => {
+        const st = statusOf(row, now);
+        if (st === "upcoming") acc.upcoming += 1;
+        if (st === "active") acc.active += 1;
+        if (st === "ended") acc.ended += 1;
+        acc.total += 1;
+        return acc;
+      },
+      { total: 0, upcoming: 0, active: 0, ended: 0 },
+    );
+  }, [rows]);
 
-      {/* Filters */}
-      <div className="rounded-md border p-3 flex flex-wrap items-center gap-2">
-        <input
-          className="rounded-md border bg-transparent px-3 py-2 text-sm flex-1 min-w-[220px]"
-          placeholder="퀴즈 검색 (제목/설명)"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-        <div className="flex items-center gap-1">
-          {(["all", "upcoming", "active", "ended"] as const).map((key) => (
-            <button
-              key={key}
-              onClick={() => setStatusFilter(key)}
-              className={`px-3 py-2 text-sm rounded-md border ${
-                statusFilter === key
-                  ? "bg-primary text-white border-primary"
-                  : "hover:bg-muted/40"
-              }`}
-              title={statusLabel(key)}
+  const handleDeleteQuiz = async (quiz: QuizRow) => {
+    if (!organizationId) return;
+    const ok = window.confirm(
+      `퀴즈 "${quiz.title}"을(를) 삭제할까요?\n삭제 후 복구할 수 없습니다.`,
+    );
+    if (!ok) return;
+
+    setDeletingQuizId(quiz.id);
+    try {
+      const { error } = await supabase
+        .from("quizzes")
+        .delete()
+        .eq("id", quiz.id)
+        .eq("organization_id", Number(organizationId));
+
+      if (error) {
+        console.error(error);
+        toast.error("퀴즈 삭제에 실패했습니다.");
+        return;
+      }
+
+      setRows((prev) => prev.filter((row) => row.id !== quiz.id));
+      toast.success("퀴즈를 삭제했습니다.");
+    } finally {
+      setDeletingQuizId(null);
+    }
+  };
+
+  return (
+    <div className="w-full max-w-5xl mx-auto space-y-4 px-2 md:px-0">
+      <section className="rounded-xl border border-gray-700 bg-[#181b24] p-4 md:p-5">
+        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <div>
+            <h1 className="text-xl font-semibold text-gray-100">퀴즈</h1>
+            <p className="mt-1 text-sm text-gray-400">
+              예정/진행/종료 상태를 한 화면에서 관리합니다.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Link
+              href={`/organization/${organizationId}/quizzes/new`}
+              className="rounded-md border border-teal-500/60 bg-teal-500/15 px-3 py-2 text-sm font-semibold text-teal-200 hover:bg-teal-500/25"
             >
-              {statusLabel(key)}
+              새 퀴즈 만들기
+            </Link>
+            <button
+              onClick={() => router.refresh()}
+              className="rounded-md border border-gray-600 px-3 py-2 text-sm text-gray-200 hover:bg-gray-700/40"
+            >
+              새로고침
             </button>
+          </div>
+        </div>
+
+        <div className="mt-4 grid gap-2 sm:grid-cols-4">
+          {[
+            { label: "전체", value: stats.total },
+            { label: "예정", value: stats.upcoming },
+            { label: "진행중", value: stats.active },
+            { label: "종료", value: stats.ended },
+          ].map((item) => (
+            <div
+              key={item.label}
+              className="rounded-md border border-gray-700 bg-[#121723] px-3 py-2"
+            >
+              <p className="text-xs text-gray-400">{item.label}</p>
+              <p className="text-base font-semibold text-gray-100">{item.value}</p>
+            </div>
           ))}
         </div>
-      </div>
+      </section>
 
-      {/* Table */}
-      <div className="rounded-md border overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead className="border-b bg-muted/40">
-            <tr>
-              <th className="p-2 text-center">제목</th>
-              <th className="p-2 text-center">기간</th>
-              <th className="p-2 text-center">상태</th>
-              <th className="p-2 text-center">제한시간</th>
-              <th className="p-2 text-center">출제 방식</th>
-              <th className="p-2 text-center">문제</th>
-              <th className="p-2 text-center">작업</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y">
-            {loading ? (
+      <section className="rounded-xl border border-gray-700 bg-[#181b24] p-4 md:p-5 space-y-3">
+        <div className="grid gap-2 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+          <input
+            className="w-full rounded-md border border-gray-600 bg-[#10141e] px-3 py-2 text-sm text-gray-100 placeholder:text-gray-500 outline-none focus:border-teal-400"
+            placeholder="퀴즈 검색 (제목/설명)"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          <div className="flex items-center gap-1.5">
+            {(["all", "upcoming", "active", "ended"] as const).map((key) => (
+              <button
+                key={key}
+                onClick={() => setStatusFilter(key)}
+                className={`px-3 py-2 text-sm rounded-md border transition-colors ${
+                  statusFilter === key
+                    ? "bg-primary text-white border-primary"
+                    : "border-gray-600 text-gray-200 hover:bg-gray-700/40"
+                }`}
+                title={statusLabel(key)}
+              >
+                {statusLabel(key)}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-gray-700 overflow-x-auto">
+          <table className="w-full min-w-[900px] table-fixed text-sm">
+            <colgroup>
+              <col className="w-[22%]" />
+              <col className="w-[20%]" />
+              <col className="w-[10%]" />
+              <col className="w-[11%]" />
+              <col className="w-[14%]" />
+              <col className="w-[9%]" />
+              <col className="w-[14%]" />
+            </colgroup>
+            <thead className="border-b border-gray-700 bg-[#222736]">
               <tr>
-                <td
-                  colSpan={7}
-                  className="p-4 text-center text-muted-foreground"
-                >
-                  불러오는 중…
-                </td>
+                <th className="px-3 py-2 text-left font-semibold text-gray-100">
+                  제목
+                </th>
+                <th className="px-3 py-2 text-left font-semibold text-gray-100">
+                  기간
+                </th>
+                <th className="px-3 py-2 text-center font-semibold text-gray-100">
+                  상태
+                </th>
+                <th className="px-3 py-2 text-center font-semibold text-gray-100">
+                  제한시간
+                </th>
+                <th className="px-3 py-2 text-left font-semibold text-gray-100">
+                  출제 방식
+                </th>
+                <th className="px-3 py-2 text-center font-semibold text-gray-100">
+                  문제
+                </th>
+                <th className="px-3 py-2 text-center font-semibold text-gray-100">
+                  작업
+                </th>
               </tr>
-            ) : filtered.length === 0 ? (
-              <tr>
-                <td
-                  colSpan={7}
-                  className="p-4 text-center text-muted-foreground"
-                >
-                  표시할 퀴즈가 없습니다.
-                </td>
-              </tr>
-            ) : (
-              filtered.map((q) => {
-                const st = statusOf(q);
-                return (
-                  <tr key={q.id} className="align-middle">
-                    <td className="p-2 text-center align-middle">
-                      <div className="font-medium">{q.title}</div>
-                      {q.description && (
-                        <div className="text-xs text-muted-foreground line-clamp-2 max-w-[36rem]">
-                          {q.description}
+            </thead>
+            <tbody className="divide-y divide-gray-700">
+              {loading ? (
+                <tr>
+                  <td colSpan={7} className="p-6 text-center text-gray-400">
+                    불러오는 중…
+                  </td>
+                </tr>
+              ) : filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="p-6 text-center text-gray-400">
+                    표시할 퀴즈가 없습니다.
+                  </td>
+                </tr>
+              ) : (
+                filtered.map((q) => {
+                  const st = statusOf(q);
+                  return (
+                    <tr key={q.id} className="align-top hover:bg-[#202635]">
+                      <td className="px-3 py-3">
+                        <div className="font-medium text-gray-100 line-clamp-1">
+                          {q.title}
                         </div>
-                      )}
-                    </td>
-                    <td className="p-2 whitespace-nowrap text-center align-middle">
-                      <div>{fmtKST(q.start_at)} ~</div>
-                      <div>{fmtKST(q.end_at)}</div>
-                    </td>
-                    <td className="p-2 text-center align-middle">
-                      {statusBadge(st)}
-                    </td>
-                    <td className="p-2 whitespace-nowrap text-center align-middle">
-                      {fmtTimeLimit(q.time_limit_sec)}
-                    </td>
-                    <td className="p-2 whitespace-nowrap text-center align-middle">
-                      {modeLabel(q.assignment_mode)}
-                    </td>
-                    <td className="p-2 whitespace-nowrap text-center align-middle">
-                      {problemInfo(q)}
-                    </td>
-                    <td className="p-2 text-center align-middle whitespace-nowrap">
-                      <div className="inline-flex items-center gap-2">
-                        {/* Placeholder routes; adjust if you add detail/edit pages */}
-                        <Link
-                          href={`/organization/${organizationId}/quizzes/${q.id}`}
-                          className="rounded-md border px-2 py-1"
-                        >
-                          상세
-                        </Link>
-                        <Link
-                          href={`/organization/${organizationId}/quizzes/${q.id}/edit`}
-                          className="rounded-md border px-2 py-1"
-                        >
-                          편집
-                        </Link>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
+                        {q.description && (
+                          <div className="mt-1 text-xs text-gray-400 line-clamp-2">
+                            {q.description}
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-3 py-3 text-xs text-gray-300">
+                        <div>{fmtKST(q.start_at)}</div>
+                        <div className="mt-1">{fmtKST(q.end_at)}</div>
+                      </td>
+                      <td className="px-3 py-3 text-center">{statusBadge(st)}</td>
+                      <td className="px-3 py-3 text-center text-gray-200">
+                        {fmtTimeLimit(q.time_limit_sec)}
+                      </td>
+                      <td className="px-3 py-3 text-xs text-gray-300">
+                        {modeLabel(q.assignment_mode)}
+                      </td>
+                      <td className="px-3 py-3 text-center text-gray-200">
+                        {problemInfo(q)}
+                      </td>
+                      <td className="px-3 py-3 text-center">
+                        <div className="inline-flex flex-wrap items-center justify-center gap-1.5 min-w-[132px]">
+                          <Link
+                            href={`/organization/${organizationId}/quizzes/${q.id}`}
+                            className="rounded-md border border-gray-600 px-2 py-1 text-xs text-gray-200 hover:bg-gray-700/40 whitespace-nowrap"
+                          >
+                            상세
+                          </Link>
+                          <Link
+                            href={`/organization/${organizationId}/quizzes/${q.id}/edit`}
+                            className="rounded-md border border-gray-600 px-2 py-1 text-xs text-gray-200 hover:bg-gray-700/40 whitespace-nowrap"
+                          >
+                            편집
+                          </Link>
+                          <button
+                            type="button"
+                            onClick={() => void handleDeleteQuiz(q)}
+                            disabled={deletingQuizId === q.id}
+                            className={`rounded-md border px-2 py-1 text-xs whitespace-nowrap ${
+                              deletingQuizId === q.id
+                                ? "cursor-not-allowed border-rose-900 text-rose-900/70"
+                                : "border-rose-600/60 text-rose-300 hover:bg-rose-500/15"
+                            }`}
+                          >
+                            {deletingQuizId === q.id ? "삭제 중" : "삭제"}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
     </div>
   );
 }
@@ -232,7 +326,7 @@ function statusOf(
   return "active";
 }
 
-function statusLabel(s: "all" | "upcoming" | "active" | "ended") {
+function statusLabel(s: StatusFilter) {
   return s === "all"
     ? "전체"
     : s === "upcoming"
@@ -245,10 +339,10 @@ function statusLabel(s: "all" | "upcoming" | "active" | "ended") {
 function statusBadge(s: "upcoming" | "active" | "ended") {
   const cls =
     s === "active"
-      ? "border-green-600 text-green-700"
+      ? "border-emerald-500/50 bg-emerald-500/15 text-emerald-300"
       : s === "upcoming"
-        ? "border-amber-600 text-amber-700"
-        : "border-rose-600 text-rose-700";
+        ? "border-amber-500/50 bg-amber-500/15 text-amber-300"
+        : "border-rose-500/50 bg-rose-500/15 text-rose-300";
   const label = s === "active" ? "진행중" : s === "upcoming" ? "예정" : "종료";
   return (
     <span
@@ -260,24 +354,20 @@ function statusBadge(s: "upcoming" | "active" | "ended") {
 }
 
 function modeLabel(m?: string) {
-  if (m === "one_for_all") return "전체 동일(전체 선택)";
-  if (m === "all") return "전체 풀이(기존)";
-  return "응시마다 무작위";
+  if (m === "one_for_all") return "전원 동일";
+  if (m === "all") return "선택 전체(구형)";
+  return "응시별 무작위";
 }
 
 function problemInfo(q: QuizRow) {
   const count = q.problem_count ?? null;
   if (q.assignment_mode === "one_for_all") {
-    if (typeof count === "number" && count > 0) {
-      return `전체 ${count}개`;
-    }
-    return q.global_problem_id ? `문제 #${q.global_problem_id}` : "문제 미지정";
+    if (typeof count === "number" && count > 0) return `${count}개`;
+    return q.global_problem_id ? `#${q.global_problem_id}` : "-";
   }
-  if (q.assignment_mode === "all") return "선택 문제 전체(기존)";
-  if (typeof count === "number" && count > 0) {
-    return `랜덤 ${count}개`;
-  }
-  return "지정 풀에서 무작위";
+  if (q.assignment_mode === "all") return "전체";
+  if (typeof count === "number" && count > 0) return `${count}개`;
+  return "-";
 }
 
 function fmtTimeLimit(sec: number) {

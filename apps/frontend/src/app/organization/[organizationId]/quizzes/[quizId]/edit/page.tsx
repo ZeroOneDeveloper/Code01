@@ -45,6 +45,7 @@ export default function EditQuizPage() {
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [quizFound, setQuizFound] = useState(true);
   const [problems, setProblems] = useState<ProblemRow[]>([]);
   const [search, setSearch] = useState("");
@@ -306,6 +307,38 @@ export default function EditQuizPage() {
     }
   };
 
+  const handleDelete = async () => {
+    if (!organizationId || !quizId || deleting) return;
+    const ok = window.confirm(
+      "이 퀴즈를 삭제할까요?\n삭제 후 복구할 수 없습니다.",
+    );
+    if (!ok) return;
+
+    setDeleting(true);
+    try {
+      const orgIdNum = Number(organizationId);
+      const quizIdFilter = isUUID(quizId) ? quizId : Number(quizId);
+
+      const { error } = await supabase
+        .from("quizzes")
+        .delete()
+        .eq("id", quizIdFilter)
+        .eq("organization_id", orgIdNum);
+
+      if (error) {
+        console.error(error);
+        toast.error("퀴즈 삭제에 실패했습니다.");
+        return;
+      }
+
+      toast.success("퀴즈를 삭제했습니다.");
+      router.replace(`/organization/${organizationId}/quizzes`);
+      router.refresh();
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="max-w-6xl mx-auto p-4">
@@ -345,6 +378,18 @@ export default function EditQuizPage() {
           >
             퀴즈 목록
           </Link>
+          <button
+            type="button"
+            onClick={() => void handleDelete()}
+            disabled={deleting}
+            className={`rounded-md border px-2.5 py-1 text-sm ${
+              deleting
+                ? "cursor-not-allowed border-rose-900 text-rose-900/70"
+                : "border-rose-600/60 text-rose-300 hover:bg-rose-500/15"
+            }`}
+          >
+            {deleting ? "삭제 중" : "삭제"}
+          </button>
         </div>
       </div>
 

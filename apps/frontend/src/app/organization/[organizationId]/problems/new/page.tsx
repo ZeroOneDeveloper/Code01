@@ -1,6 +1,6 @@
 "use client";
 
-import React, { JSX, useEffect, useRef, useState } from "react";
+import React, { JSX, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { useTheme } from "next-themes";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
@@ -79,7 +79,7 @@ const normalizeMarkdown = (s: string) =>
     .replace(/\uFF3F/g, "_"); // ＿ → _
 
 const NewProblemPage = () => {
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
 
   const [user, setUser] = useState<User | null>(null);

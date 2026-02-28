@@ -26,6 +26,7 @@ type UpcomingQuiz = {
   time_limit_sec: number | null;
   assignment_mode: string | null;
   problem_count: number | null;
+  status?: "upcoming" | "active" | string;
 };
 
 type ProblemSection = {

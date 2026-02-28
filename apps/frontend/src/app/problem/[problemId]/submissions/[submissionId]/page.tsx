@@ -7,6 +7,7 @@ import Editor from "@monaco-editor/react";
 import Link from "next/link";
 
 import { createClient } from "@lib/supabase/client";
+import { formatMemoryKb } from "@lib/format-memory";
 import type { User } from "@lib/supabase/types";
 import { Problem, Submission, UserProfile, toStatusKo } from "@lib/types";
 import { Bounce, toast } from "react-toastify";
@@ -14,7 +15,7 @@ import { useTheme } from "next-themes";
 
 const SubmissionCodePage: React.FC = () => {
   const { theme } = useTheme();
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const params = useParams<{ problemId: string; submissionId: string }>();
 
   const [user, setUser] = useState<User | null>(null);
@@ -43,7 +44,10 @@ const SubmissionCodePage: React.FC = () => {
     [submission?.time_ms],
   );
   const memoryText = useMemo(
-    () => (submission?.memory_kb ? `${submission.memory_kb} KB` : "제한없음"),
+    () =>
+      submission?.memory_kb !== null && submission?.memory_kb !== undefined
+        ? formatMemoryKb(submission.memory_kb, "0 KB")
+        : "제한없음",
     [submission?.memory_kb],
   );
 
