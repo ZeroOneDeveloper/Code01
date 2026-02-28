@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   ChevronDown,
@@ -8,7 +8,6 @@ import {
   ChevronsUpDown,
   Lock,
   Search,
-  SlidersHorizontal,
 } from "lucide-react";
 
 import { Problem, toGradeKo } from "@lib/types";
@@ -112,8 +111,22 @@ export default function MainProblemSections({
 }: Props) {
   const [search, setSearch] = useState("");
   const [isSearchMenuOpen, setIsSearchMenuOpen] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>("title");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
+
+  useEffect(() => {
+    const onToggle = () => {
+      setIsSearchMenuOpen((prev) => !prev);
+    };
+    window.addEventListener("home-search-toggle", onToggle);
+    return () => window.removeEventListener("home-search-toggle", onToggle);
+  }, []);
+
+  useEffect(() => {
+    if (!isSearchMenuOpen) return;
+    searchInputRef.current?.focus();
+  }, [isSearchMenuOpen]);
 
   const filteredSections = useMemo(() => {
     const q = normalizeText(search);
@@ -209,24 +222,9 @@ export default function MainProblemSections({
       {sections.length > 0 ? (
         <>
           <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-3">
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                현재 표시: {visibleProblemCount}문제
-              </p>
-              <button
-                type="button"
-                onClick={() => setIsSearchMenuOpen((prev) => !prev)}
-                className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 dark:border-gray-600 px-3 py-1.5 text-xs font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
-              >
-                <SlidersHorizontal className="h-3.5 w-3.5" />
-                검색 메뉴
-                {isSearchMenuOpen ? (
-                  <ChevronUp className="h-3.5 w-3.5" />
-                ) : (
-                  <ChevronDown className="h-3.5 w-3.5" />
-                )}
-              </button>
-            </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              현재 표시: {visibleProblemCount}문제
+            </p>
           </div>
 
           {isSearchMenuOpen && (
@@ -234,6 +232,7 @@ export default function MainProblemSections({
               <label className="relative block">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
                 <input
+                  ref={searchInputRef}
                   type="text"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}

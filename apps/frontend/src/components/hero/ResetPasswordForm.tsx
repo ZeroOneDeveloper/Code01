@@ -26,6 +26,7 @@ const ResetPasswordForm = () => {
   const [password, setPassword] = React.useState("");
   const [confirmPassword, setConfirmPassword] = React.useState("");
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [isCodeRequested, setIsCodeRequested] = React.useState(false);
 
   const showError = React.useCallback(
     (message: string) => {
@@ -79,6 +80,7 @@ const ResetPasswordForm = () => {
 
     showSuccess("재설정 링크를 이메일로 보냈습니다.");
     setEmail("");
+    setIsCodeRequested(true);
   };
 
   const handleConfirmReset = async () => {
@@ -119,6 +121,7 @@ const ResetPasswordForm = () => {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (isSubmitting) return;
+    if (!hasToken && isCodeRequested) return;
 
     setIsSubmitting(true);
     try {
@@ -179,11 +182,11 @@ const ResetPasswordForm = () => {
 
       <button
         type="submit"
-        disabled={isSubmitting}
+        disabled={isSubmitting || (!hasToken && isCodeRequested)}
         aria-busy={isSubmitting}
         className={
           `px-4 py-2 rounded-lg font-bold transition-all duration-300 ease-in-out shadow-md flex items-center justify-center gap-2 ` +
-          (isSubmitting
+          (isSubmitting || (!hasToken && isCodeRequested)
             ? "bg-gray-300 text-gray-600 dark:bg-gray-700 dark:text-gray-300 cursor-not-allowed hover:scale-100"
             : "bg-primary text-white hover:scale-110 hover:cursor-pointer")
         }
@@ -210,7 +213,13 @@ const ResetPasswordForm = () => {
             ></path>
           </svg>
         )}
-        {isSubmitting ? "처리중..." : hasToken ? "비밀번호 변경" : "재설정 링크 보내기"}
+        {isSubmitting
+          ? "처리중..."
+          : hasToken
+            ? "비밀번호 변경"
+            : isCodeRequested
+              ? "코드 발송 완료"
+              : "코드 받기"}
       </button>
 
       <h1 className="text-right text-sm text-gray-500">

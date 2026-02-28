@@ -842,13 +842,15 @@ const NewProblemPage = () => {
                   key={`${img.path}-${idx}`}
                   className="flex items-center gap-3 rounded-md border border-gray-200 dark:border-gray-700 p-2 bg-white dark:bg-gray-800"
                 >
-                  <Image
-                    src={img.url}
-                    alt="uploaded"
-                    width={64}
-                    height={64}
-                    className="h-16 w-16 object-contain rounded"
-                  />
+                  <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
+                    <Image
+                      src={img.url}
+                      alt="uploaded"
+                      fill
+                      sizes="64px"
+                      className="object-contain p-1"
+                    />
+                  </div>
                   <div className="min-w-0 flex-1">
                     <div className="text-sm font-medium truncate">
                       {img.path.split("/").pop()}

@@ -2,9 +2,9 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
-import { CircleUserRound, Menu } from "lucide-react";
+import { CircleUserRound, Menu, Search } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 
 import { UserProfile } from "@lib/types";
@@ -42,6 +42,7 @@ const menuItems = [
 export default function Header() {
   const supabase = createClient();
   const router = useRouter();
+  const pathname = usePathname();
 
   const [user, setUser] = useState<User | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
@@ -102,6 +103,11 @@ export default function Header() {
     window.location.replace("/");
   };
 
+  const handleToggleHomeSearch = () => {
+    if (pathname !== "/") return;
+    window.dispatchEvent(new CustomEvent("home-search-toggle"));
+  };
+
   return (
     <nav className="w-full flex justify-between md:justify-around items-center px-8 md:px-0 py-8 z-50 bg-white dark:bg-dark">
       <div className="w-6 block md:hidden" />
@@ -113,6 +119,17 @@ export default function Header() {
       {/* Desktop Menu */}
       <div className="hidden md:flex items-center gap-2">
         <ThemeToggle />
+        {pathname === "/" && (
+          <button
+            onClick={handleToggleHomeSearch}
+            className="relative flex h-10 w-10 items-center justify-center rounded-full bg-transparent
+             hover:bg-black/10 dark:hover:bg-white/10 transition-colors duration-300 ease-in-out"
+            aria-label="문제 검색"
+            title="문제 검색"
+          >
+            <Search className="h-5 w-5 dark:text-gray-100" />
+          </button>
+        )}
         {user ? (
           <div className="relative" ref={dropdownRef}>
             <button
@@ -206,6 +223,20 @@ export default function Header() {
           >
             <div className="flex flex-col items-start gap-4">
               <ThemeToggle />
+              {pathname === "/" && (
+                <button
+                  onClick={() => {
+                    handleToggleHomeSearch();
+                    setMobileMenuOpen(false);
+                  }}
+                  className="relative flex h-10 w-10 items-center justify-center rounded-full bg-transparent
+             hover:bg-black/10 dark:hover:bg-white/10 transition-colors duration-300 ease-in-out"
+                  aria-label="문제 검색"
+                  title="문제 검색"
+                >
+                  <Search className="h-5 w-5 dark:text-gray-100" />
+                </button>
+              )}
               <hr className="w-full border-gray-200 dark:border-gray-700" />
               {user ? (
                 <>
