@@ -10,6 +10,7 @@ import { FaJava } from "react-icons/fa";
 import { SiC, SiCplusplus, SiPython } from "react-icons/si";
 
 import Checkbox from "@components/Checkbox";
+import { getClientApiBaseUrl } from "@lib/api-base";
 import { Language } from "@lib/types";
 
 type QuizSubmitContext = {
@@ -227,7 +228,7 @@ const ProblemSubmitForm: React.FC<{
 
   const submitToRunner = useCallback(
     async (sourceCode: string): Promise<number> => {
-      const res = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/runner/`, {
+      const res = await axios.post(`${getClientApiBaseUrl()}/runner/`, {
         userId,
         problemId,
         code: sourceCode,

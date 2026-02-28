@@ -1,8 +1,4 @@
-const DEFAULT_API_BASE = "http://localhost:3001";
-
-function getApiBaseUrl() {
-  return process.env.NEXT_PUBLIC_API_URL ?? DEFAULT_API_BASE;
-}
+import { getClientApiBaseUrl } from "./api-base";
 
 export type QuizEntryQuiz = {
   id: number;
@@ -92,7 +88,7 @@ export async function fetchQuizEntryContext(
 
   try {
     const response = await fetch(
-      `${getApiBaseUrl()}/data/quizzes/${orgId}/${quizIdNum}/entry-context`,
+      `${getClientApiBaseUrl()}/data/quizzes/${orgId}/${quizIdNum}/entry-context`,
       {
         method: "GET",
         credentials: "include",

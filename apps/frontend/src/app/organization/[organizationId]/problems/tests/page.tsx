@@ -17,6 +17,7 @@ import {
 
 import { TestCase } from "@lib/types";
 import { createClient } from "@lib/supabase/client";
+import { getClientApiBaseUrl } from "@lib/api-base";
 
 const DEFAULT_PY_TEMPLATE = `# 반드시 generate(seed: int) -> tuple[str, str]를 정의하세요.
 # 반환: (input_text, output_text). 표준입력/출력 포맷은 문제 요구에 맞춰 작성하세요.
@@ -178,7 +179,7 @@ export default function ProblemTestsPage() {
     setSubmitting(true);
 
     axios
-      .post(`${process.env.NEXT_PUBLIC_API_URL}/testCase/generate`, {
+      .post(`${getClientApiBaseUrl()}/testCase/generate`, {
         problem_id: problemId,
         code: pyCode,
         count: c,

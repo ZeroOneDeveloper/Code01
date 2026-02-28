@@ -4,6 +4,7 @@ import type {
   SupabaseLikeError,
   User,
 } from "./types";
+import { getClientApiBaseUrl, getServerApiBaseUrl } from "../api-base";
 
 type QueryFilter = {
   op: "eq" | "in";
@@ -35,7 +36,6 @@ type RequestContext = {
 
 type AuthResponse<T> = Promise<{ data: T; error: SupabaseLikeError | null }>;
 
-const DEFAULT_API_BASE = "http://localhost:3001";
 const POLL_INTERVAL_MS = 1000;
 
 function isBrowser() {
@@ -44,14 +44,10 @@ function isBrowser() {
 
 function getApiBaseUrl() {
   if (isBrowser()) {
-    return process.env.NEXT_PUBLIC_API_URL ?? DEFAULT_API_BASE;
+    return getClientApiBaseUrl();
   }
 
-  return (
-    process.env.INTERNAL_API_URL ??
-    process.env.NEXT_PUBLIC_API_URL ??
-    DEFAULT_API_BASE
-  );
+  return getServerApiBaseUrl();
 }
 
 function toError(message: string): SupabaseLikeError {
