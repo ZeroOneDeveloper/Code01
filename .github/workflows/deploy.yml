@@ -46,6 +46,7 @@ jobs:
             set -euxo pipefail
 
             PROJECT_DIR="${DEPLOY_PATH:-$HOME/Code01}"
+            PROJECT_DIR="${PROJECT_DIR/#\~/$HOME}"
             REF_TO_DEPLOY="${DEPLOY_REF:-main}"
 
             cd "$PROJECT_DIR"
