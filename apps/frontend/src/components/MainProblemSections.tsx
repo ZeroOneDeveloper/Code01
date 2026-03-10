@@ -289,20 +289,20 @@ export default function MainProblemSections({
                   </div>
 
                   <div className="overflow-x-auto">
-                    <table className="table-fixed w-full border border-gray-200 bg-white dark:bg-gray-900 rounded-lg">
+                    <table className="table-auto w-full border border-gray-200 bg-white dark:bg-gray-900 rounded-lg">
                       <colgroup>
-                        <col className="w-16" />
-                        <col className="w-64" />
+                        <col className="w-20" />
+                        <col />
                         <col className="w-32" />
                         <col className="w-24" />
+                        <col className="w-20" />
                         <col className="w-24" />
-                        <col className="w-24" />
-                        <col className="w-24" />
+                        <col className="w-20" />
                         <col className="w-24" />
                       </colgroup>
                       <thead>
                         <tr className="bg-gray-100 dark:bg-gray-800">
-                          <th className="px-4 py-2 text-left font-semibold text-gray-700 dark:text-gray-200 border-b">
+                          <th className="px-4 py-2 text-left font-semibold text-gray-700 dark:text-gray-200 border-b whitespace-nowrap">
                             <button
                               type="button"
                               onClick={() => toggleSort("id")}
@@ -312,7 +312,7 @@ export default function MainProblemSections({
                               {sortIcon("id")}
                             </button>
                           </th>
-                          <th className="px-4 py-2 text-left font-semibold text-gray-700 dark:text-gray-200 border-b">
+                          <th className="px-4 py-2 text-left font-semibold text-gray-700 dark:text-gray-200 border-b whitespace-nowrap">
                             <button
                               type="button"
                               onClick={() => toggleSort("title")}
@@ -322,7 +322,7 @@ export default function MainProblemSections({
                               {sortIcon("title")}
                             </button>
                           </th>
-                          <th className="px-4 py-2 text-left font-semibold text-gray-700 dark:text-gray-200 border-b">
+                          <th className="px-4 py-2 text-left font-semibold text-gray-700 dark:text-gray-200 border-b whitespace-nowrap">
                             <button
                               type="button"
                               onClick={() => toggleSort("source")}
@@ -332,7 +332,7 @@ export default function MainProblemSections({
                               {sortIcon("source")}
                             </button>
                           </th>
-                          <th className="px-4 py-2 text-left font-semibold text-gray-700 dark:text-gray-200 border-b">
+                          <th className="px-4 py-2 text-left font-semibold text-gray-700 dark:text-gray-200 border-b whitespace-nowrap">
                             <button
                               type="button"
                               onClick={() => toggleSort("uploader")}
@@ -342,16 +342,16 @@ export default function MainProblemSections({
                               {sortIcon("uploader")}
                             </button>
                           </th>
-                          <th className="px-4 py-2 text-left font-semibold text-gray-700 dark:text-gray-200 border-b">
+                          <th className="px-4 py-2 text-left font-semibold text-gray-700 dark:text-gray-200 border-b whitespace-nowrap">
                             등급
                           </th>
-                          <th className="px-4 py-2 text-right font-semibold text-gray-700 dark:text-gray-200 border-b">
+                          <th className="px-4 py-2 text-right font-semibold text-gray-700 dark:text-gray-200 border-b whitespace-nowrap">
                             맞힌 사람
                           </th>
-                          <th className="px-4 py-2 text-right font-semibold text-gray-700 dark:text-gray-200 border-b">
+                          <th className="px-4 py-2 text-right font-semibold text-gray-700 dark:text-gray-200 border-b whitespace-nowrap">
                             제출
                           </th>
-                          <th className="px-4 py-2 text-right font-semibold text-gray-700 dark:text-gray-200 border-b">
+                          <th className="px-4 py-2 text-right font-semibold text-gray-700 dark:text-gray-200 border-b whitespace-nowrap">
                             정답 비율
                           </th>
                         </tr>
