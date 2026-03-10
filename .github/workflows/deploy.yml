@@ -59,4 +59,4 @@ jobs:
             git checkout "$REF_TO_DEPLOY"
             git pull --ff-only origin "$REF_TO_DEPLOY"
 
-            printf '%s\n' "${DEPLOY_SSH_PASSWORD}" | sudo -S -k -p '' bash -lc "set -eux; whoami; docker --version; docker compose version; cd '$PROJECT_DIR'; docker compose up -d --build"
+            printf '%s\n' "${DEPLOY_SSH_PASSWORD}" | sudo -S -k -p '' bash -lc "set -eux; whoami; docker --version; docker compose version; cd '$PROJECT_DIR'; docker compose down --remove-orphans; docker compose up -d --build"
