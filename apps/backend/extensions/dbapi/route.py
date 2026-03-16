@@ -14,6 +14,7 @@ from sqlalchemy.sql.sqltypes import BigInteger, Boolean, DateTime, Float, Intege
 from db.models import (
     Organization,
     OrganizationMember,
+    PendingSignup,
     Problem,
     ProblemAsset,
     ProblemSubmission,
@@ -37,6 +38,7 @@ MODEL_MAP = {
     "users": User,
     "organizations": Organization,
     "organization_members": OrganizationMember,
+    "pending_signups": PendingSignup,
     "problems": Problem,
     "test_cases": TestCase,
     "problem_assets": ProblemAsset,

@@ -32,8 +32,26 @@ router = APIRouter(
 )
 
 COOKIE_NAME = os.getenv("AUTH_COOKIE_NAME", "code01_session")
-COOKIE_DOMAIN = os.getenv("AUTH_COOKIE_DOMAIN")
 COOKIE_SECURE = os.getenv("AUTH_COOKIE_SECURE", "false").lower() == "true"
+
+
+def _derive_cookie_domain() -> str | None:
+    """Return AUTH_COOKIE_DOMAIN, or derive from FRONTEND_ORIGIN as fallback."""
+    explicit = os.getenv("AUTH_COOKIE_DOMAIN")
+    if explicit:
+        return explicit
+    origin = os.getenv("FRONTEND_ORIGIN", "")
+    host = urlsplit(origin).hostname or ""
+    if not host or host in ("localhost", "127.0.0.1"):
+        return None
+    # Prefix with dot so the cookie covers all subdomains (e.g. api.code01.kr)
+    return f".{host}" if not host.startswith(".") else host
+
+
+COOKIE_DOMAIN = _derive_cookie_domain()
+print(
+    f"[auth] cookie config: name={COOKIE_NAME} domain={COOKIE_DOMAIN} secure={COOKIE_SECURE}"
+)
 TOKEN_TTL_SECONDS = int(os.getenv("AUTH_TOKEN_TTL_SECONDS", "604800"))  # 7 days
 VERIFY_TOKEN_TTL_SECONDS = int(os.getenv("AUTH_VERIFY_TOKEN_TTL_SECONDS", "86400"))
 RESET_TOKEN_TTL_SECONDS = int(os.getenv("AUTH_RESET_TOKEN_TTL_SECONDS", "3600"))
