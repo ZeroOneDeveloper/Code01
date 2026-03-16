@@ -2,10 +2,12 @@ import os
 from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import Response
 
 APP_DIR = Path(__file__).resolve().parent
 for candidate in (
@@ -50,6 +52,17 @@ allow_origin_regex = os.getenv(
     r"^https?://(localhost|127\.0\.0\.1|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3})(:3000)?$",
 )
 
+class NoCacheMiddleware(BaseHTTPMiddleware):
+    """Prevent reverse proxies / CDNs from caching API responses."""
+
+    async def dispatch(self, request: Request, call_next):  # type: ignore[override]
+        response: Response = await call_next(request)
+        if "cache-control" not in response.headers:
+            response.headers["cache-control"] = "no-store"
+        return response
+
+
+app.add_middleware(NoCacheMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allow_origins,
