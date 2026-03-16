@@ -223,7 +223,9 @@ async function requestJson(
     body = JSON.stringify(init.bodyJson);
   }
 
-  if (!isBrowser() && context.cookieHeader) {
+  const isServer = !isBrowser();
+
+  if (isServer && context.cookieHeader) {
     headers.set("cookie", context.cookieHeader);
   }
 
@@ -231,7 +233,11 @@ async function requestJson(
     ...init,
     body,
     headers,
-    credentials: "include",
+    // credentials: "include" is needed in the browser to send cookies
+    // cross-origin.  On the server we forward cookies via the header
+    // above, and setting credentials can cause Node/undici to drop the
+    // manually-set Cookie header.
+    ...(isServer ? {} : { credentials: "include" as RequestCredentials }),
     cache: "no-store",
   });
 
@@ -514,8 +520,9 @@ class StorageBucket {
     formData.append("upsert", String(options?.upsert === true));
     formData.append("file", file);
 
+    const isServer = !isBrowser();
     const headers = new Headers();
-    if (!isBrowser() && this.context.cookieHeader) {
+    if (isServer && this.context.cookieHeader) {
       headers.set("cookie", this.context.cookieHeader);
     }
 
@@ -523,7 +530,7 @@ class StorageBucket {
       method: "POST",
       body: formData,
       headers,
-      credentials: "include",
+      ...(isServer ? {} : { credentials: "include" as RequestCredentials }),
       cache: "no-store",
     });
 

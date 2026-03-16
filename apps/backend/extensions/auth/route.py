@@ -727,6 +727,12 @@ async def logout():
 async def me(request: Request, db: AsyncSession = Depends(get_db)):
     user_id = _auth_user_id_from_request(request)
     if not user_id:
+        cookie_keys = list(request.cookies.keys())
+        has_session = COOKIE_NAME in cookie_keys
+        print(
+            f"[auth] /me: no valid session. cookie_keys={cookie_keys} "
+            f"has_session_cookie={has_session}"
+        )
         return {"user": None, "error": None}
 
     user = await _get_user_by_id(db, user_id)
