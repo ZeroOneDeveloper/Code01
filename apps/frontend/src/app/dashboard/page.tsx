@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import {
   BookOpenText,
   Building2,
@@ -244,6 +245,7 @@ export default async function DashboardPage() {
       icon: Users,
       color: "text-blue-600 dark:text-blue-400",
       subtext: "전체 가입 사용자",
+      href: "/dashboard/users",
     },
     {
       title: "조직 수",
@@ -296,11 +298,8 @@ export default async function DashboardPage() {
           </div>
 
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            {stats.map((stat) => (
-              <div
-                key={stat.title}
-                className="bg-white dark:bg-neutral-900/70 rounded-xl shadow-sm border border-gray-200/70 dark:border-neutral-700/70 overflow-hidden"
-              >
+            {stats.map((stat) => {
+              const card = (
                 <div className="p-5">
                   <div className="flex items-center">
                     <div
@@ -325,8 +324,20 @@ export default async function DashboardPage() {
                     {stat.subtext}
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+
+              const className = `bg-white dark:bg-neutral-900/70 rounded-xl shadow-sm border border-gray-200/70 dark:border-neutral-700/70 overflow-hidden${stat.href ? " hover:border-gray-300 dark:hover:border-neutral-600 transition-colors" : ""}`;
+
+              return stat.href ? (
+                <Link key={stat.title} href={stat.href} className={className}>
+                  {card}
+                </Link>
+              ) : (
+                <div key={stat.title} className={className}>
+                  {card}
+                </div>
+              );
+            })}
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
