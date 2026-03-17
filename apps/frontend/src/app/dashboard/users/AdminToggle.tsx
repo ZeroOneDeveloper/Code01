@@ -5,10 +5,12 @@ import { createClient } from "@lib/supabase/client";
 
 export default function AdminToggle({
   userId,
+  userName,
   initialValue,
   isSelf,
 }: {
   userId: string;
+  userName: string;
   initialValue: boolean;
   isSelf: boolean;
 }) {
@@ -17,6 +19,10 @@ export default function AdminToggle({
 
   const handleToggle = async () => {
     if (isSelf) return;
+
+    const action = isAdmin ? "관리자 권한을 해제" : "관리자 권한을 부여";
+    if (!window.confirm(`${userName}님의 ${action}하시겠습니까?`)) return;
+
     setLoading(true);
     try {
       const supabase = createClient();

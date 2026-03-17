@@ -156,6 +156,7 @@ export default async function DashboardUsersPage() {
                         <td className="py-2 pr-4 text-center">
                           <AdminToggle
                             userId={u.id}
+                            userName={u.nickname || u.name || u.email}
                             initialValue={u.is_admin}
                             isSelf={u.id === user.id}
                           />
