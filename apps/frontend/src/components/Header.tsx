@@ -39,13 +39,19 @@ const menuItems = [
   },
 ];
 
-export default function Header() {
+export default function Header({
+  initialUser = null,
+  initialProfile = null,
+}: {
+  initialUser?: User | null;
+  initialProfile?: UserProfile | null;
+} = {}) {
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
   const pathname = usePathname();
 
-  const [user, setUser] = useState<User | null>(null);
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [user, setUser] = useState<User | null>(initialUser);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(initialProfile);
 
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -72,31 +78,6 @@ export default function Header() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
-
-  useEffect(() => {
-    (async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      setUser(user);
-
-      if (user) {
-        const { data, error } = await supabase
-          .from("users")
-          .select("*")
-          .eq("id", user.id)
-          .single();
-
-        if (error) {
-          console.error("Error fetching user profile:", error);
-        } else {
-          setUserProfile(data);
-        }
-      } else {
-        setUserProfile(null);
-      }
-    })();
-  }, [supabase]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
