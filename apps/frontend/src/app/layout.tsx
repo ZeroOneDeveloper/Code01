@@ -35,7 +35,14 @@ export default async function RootLayout({
   }
 
   return (
-    <html suppressHydrationWarning>
+    <html suppressHydrationWarning className="no-transition">
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem("theme");if(t==="dark"||(!t&&matchMedia("(prefers-color-scheme:dark)").matches))document.documentElement.classList.add("dark")}catch(e){}requestAnimationFrame(function(){document.documentElement.classList.remove("no-transition")})})()`,
+          }}
+        />
+      </head>
       <body className="min-h-screen dark:bg-dark bg-white transition-colors duration-500 ease-in-out text-black dark:text-white">
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           <div className="min-h-screen flex flex-col">

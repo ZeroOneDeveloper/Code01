@@ -28,3 +28,10 @@ body {
   --color-primary: #18a497;
   --color-dark: #212126;
 }
+
+html.no-transition,
+html.no-transition *,
+html.no-transition *::before,
+html.no-transition *::after {
+  transition: none !important;
+}
